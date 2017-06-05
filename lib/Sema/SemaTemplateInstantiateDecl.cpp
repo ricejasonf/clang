@@ -23,6 +23,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/PrettyDeclStackTrace.h"
 #include "clang/Sema/Template.h"
+#include "clang/Sema/TemplateInstCallbacks.h"
 
 using namespace clang;
 
@@ -3634,8 +3635,12 @@ TemplateDeclInstantiator::InitFunctionInstantiation(FunctionDecl *New,
       assert(FunTmpl->getTemplatedDecl() == Tmpl &&
              "Deduction from the wrong function template?");
       (void) FunTmpl;
+      if (SemaRef.TemplateInstCallbacksChain)
+        SemaRef.TemplateInstCallbacksChain->atTemplateEnd(SemaRef, ActiveInst);
       ActiveInst.Kind = ActiveInstType::TemplateInstantiation;
       ActiveInst.Entity = New;
+      if (SemaRef.TemplateInstCallbacksChain)
+        SemaRef.TemplateInstCallbacksChain->atTemplateBegin(SemaRef, ActiveInst);
     }
   }
 
