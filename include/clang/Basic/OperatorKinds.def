@@ -103,6 +103,7 @@ OVERLOADED_OPERATOR_MULTI(Subscript      , "[]"                       , false, t
 // resolution machinery for it.
 OVERLOADED_OPERATOR_MULTI(Conditional    , "?"                        , false, true , false)
 OVERLOADED_OPERATOR(Coawait              , "co_await", kw_co_await    , true , false, false)
+OVERLOADED_OPERATOR_MULTI(PostfixTilde   , "()~"                      , true , false, true)
 
 #undef OVERLOADED_OPERATOR_MULTI
 #undef OVERLOADED_OPERATOR

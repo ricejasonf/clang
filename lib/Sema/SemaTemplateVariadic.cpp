@@ -58,6 +58,12 @@ namespace {
       if (T->getDepth() < DepthLimit)
         Unexpanded.push_back({T, Loc});
     }
+    void addUnexpanded(ResolvedUnexpandedPackExpr *E) {
+      Unexpanded.push_back({E, E->getBeginLoc()});
+    }
+    void addUnexpanded(DependentPackOpExpr *E) {
+      Unexpanded.push_back({E, E->getBeginLoc()});
+    }
 
   public:
     explicit CollectUnexpandedParameterPacksVisitor(
@@ -95,6 +101,16 @@ namespace {
       if (E->getDecl()->isParameterPack())
         addUnexpanded(E->getDecl(), E->getLocation());
 
+      return true;
+    }
+
+    bool VisitResolvedUnexpandedPackExpr(ResolvedUnexpandedPackExpr *E) {
+      addUnexpanded(E);
+      return true;
+    }
+
+    bool VisitDependentPackOpExpr(DependentPackOpExpr *E) {
+      addUnexpanded(E);
       return true;
     }
 
@@ -345,7 +361,7 @@ Sema::DiagnoseUnexpandedParameterPacks(SourceLocation Loc,
     if (const TemplateTypeParmType *TTP
           = Unexpanded[I].first.dyn_cast<const TemplateTypeParmType *>())
       Name = TTP->getIdentifier();
-    else
+    else if (Unexpanded[I].first.is<NamedDecl *>())
       Name = Unexpanded[I].first.get<NamedDecl *>()->getIdentifier();
 
     if (Name && NamesKnown.insert(Name).second)
@@ -643,12 +659,18 @@ bool Sema::CheckParameterPacksForExpansion(
     unsigned Depth = 0, Index = 0;
     IdentifierInfo *Name;
     bool IsFunctionParameterPack = false;
+    ResolvedUnexpandedPackExpr *ResolvedPack = nullptr;
 
     if (const TemplateTypeParmType *TTP
         = i->first.dyn_cast<const TemplateTypeParmType *>()) {
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
       Name = TTP->getIdentifier();
+    } else if (auto *RP = i->first.dyn_cast<ResolvedUnexpandedPackExpr*>()) {
+      ResolvedPack = RP;
+    } else if (i->first.is<DependentPackOpExpr*>()) {
+      ShouldExpand = false;
+      continue;
     } else {
       NamedDecl *ND = i->first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND))
@@ -677,6 +699,8 @@ bool Sema::CheckParameterPacksForExpansion(
         ShouldExpand = false;
         continue;
       }
+    } else if (ResolvedPack) {
+      NewPackSize = ResolvedPack->getNumExprs();
     } else {
       // If we don't have a template argument at this depth/index, then we
       // cannot expand the pack expansion. Make a note of this, but we still
@@ -695,7 +719,8 @@ bool Sema::CheckParameterPacksForExpansion(
     //   Template argument deduction can extend the sequence of template
     //   arguments corresponding to a template parameter pack, even when the
     //   sequence contains explicitly specified template arguments.
-    if (!IsFunctionParameterPack && CurrentInstantiationScope) {
+    if (!IsFunctionParameterPack && !ResolvedPack &&
+        CurrentInstantiationScope) {
       if (NamedDecl *PartialPack
                     = CurrentInstantiationScope->getPartiallySubstitutedPack()){
         unsigned PartialDepth, PartialIndex;
@@ -777,6 +802,14 @@ Optional<unsigned> Sema::getNumArgumentsInExpansion(QualType T,
           = Unexpanded[I].first.dyn_cast<const TemplateTypeParmType *>()) {
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
+    } else if (auto *PE
+          = Unexpanded[I].first.dyn_cast<ResolvedUnexpandedPackExpr *>()) {
+      unsigned Size = PE->getNumExprs();
+      assert((!Result || *Result == Size) && "inconsistent pack sizes");
+      Result = Size;
+      continue;
+    } else if (Unexpanded[I].first.is<DependentPackOpExpr *>()) {
+      return None;
     } else {
       NamedDecl *ND = Unexpanded[I].first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND)) {
@@ -920,6 +953,79 @@ bool Sema::containsUnexpandedParameterPacks(Declarator &D) {
   }
 
   return false;
+}
+
+bool Sema::containsAllResolvedPacks(Expr *Pattern) {
+  // This might incur a performance hit, but it is
+  // very low impact on the code base compared to
+  // other solutions.
+  // TODO benchmark against vanilla clang with
+  //      Boost.Hana's tests or something
+  SmallVector<UnexpandedParameterPack, 4> Unexpanded;
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  if (Unexpanded.empty())
+    return false;
+
+  for (auto& I : Unexpanded) {
+    if (!I.first.is<ResolvedUnexpandedPackExpr*>()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+bool Sema::containsAllResolvedPacks(QualType Pattern) {
+  // This might incur a performance hit, but it is
+  // very low impact on the code base compared to
+  // other solutions.
+  // TODO benchmark against vanilla clang with
+  //      Boost.Hana's tests or something
+  SmallVector<UnexpandedParameterPack, 4> Unexpanded;
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  if (Unexpanded.empty())
+    return false;
+
+  for (auto& I : Unexpanded) {
+    if (!I.first.is<ResolvedUnexpandedPackExpr*>()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                            SmallVectorImpl<SourceLocation> &CommaLocs,
+                                    SmallVectorImpl<Expr *> &Outputs) {
+  unsigned InitialSize = Outputs.size();
+  if (TryExpandResolvedPackExpansion(Expansion, Outputs))
+    return true;
+
+  // Fake the comma location funk
+  unsigned ExprsAdded = Outputs.size() - InitialSize;
+  for (unsigned I = 1; I < ExprsAdded; ++I)
+    CommaLocs.push_back(SourceLocation());
+
+  return false;
+}
+
+bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                                    SmallVectorImpl<Expr *> &Outputs) {
+  if (!Expansion)
+    return true;
+
+  if (!containsAllResolvedPacks(Expansion->getPattern())) {
+    Outputs.push_back(Expansion);
+    return false;
+  }
+
+  // If it is not dependent then we can expand it
+  return SubstExprs(ArrayRef<Expr*>(reinterpret_cast<Expr**>(&Expansion), 
+                                    reinterpret_cast<Expr**>(&Expansion) + 1),
+                    /*IsCall=*/false, /*TemplateArgs=*/{}, Outputs);
 }
 
 namespace {
@@ -1172,7 +1278,18 @@ ExprResult Sema::ActOnCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,
   }
 
   BinaryOperatorKind Opc = ConvertTokenKindToBinaryOpcode(Operator);
-  return BuildCXXFoldExpr(LParenLoc, LHS, Opc, EllipsisLoc, RHS, RParenLoc);
+  ExprResult Result = BuildCXXFoldExpr(LParenLoc, LHS, Opc, EllipsisLoc, RHS,
+                                       RParenLoc);
+
+  // If we can expand it now, do so. This can happen when a parametric
+  // expression returns an expression containing an unexpanded pack.
+  if (Result.isUsable() && 
+      (!LHS || containsAllResolvedPacks(LHS)) &&
+      (!RHS || containsAllResolvedPacks(RHS))) {
+    return SubstExpr(Result.get(), /*TemplateArgs=*/{});
+  }
+
+  return Result;
 }
 
 ExprResult Sema::BuildCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,

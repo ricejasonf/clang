@@ -1050,7 +1050,7 @@ public:
   CanQualType Float128ComplexTy;
   CanQualType VoidPtrTy, NullPtrTy;
   CanQualType DependentTy, OverloadTy, BoundMemberTy, UnknownAnyTy;
-  CanQualType BuiltinFnTy;
+  CanQualType BuiltinFnTy, ParametricExpressionIdTy;
   CanQualType PseudoObjectTy, ARCUnbridgedCastTy;
   CanQualType ObjCBuiltinIdTy, ObjCBuiltinClassTy, ObjCBuiltinSelTy;
   CanQualType ObjCBuiltinBoolTy;

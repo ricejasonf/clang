@@ -234,6 +234,9 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
   case BuiltinType::OMPArraySection:
     ID = PREDEF_TYPE_OMP_ARRAY_SECTION;
     break;
+  case BuiltinType::ParametricExpressionId:
+    ID = PREDEF_TYPE_PARAMETRIC_EXPRESSION_ID;
+    break;
   }
 
   return TypeIdx(ID);
@@ -388,6 +391,7 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::BuiltinTemplate:
   case Decl::Decomposition:
   case Decl::Binding:
+  case Decl::ParametricExpression:
     return false;
 
   // These indirectly derive from Redeclarable<T> but are not actually

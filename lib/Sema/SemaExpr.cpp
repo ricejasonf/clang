@@ -2118,6 +2118,12 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
   if (R.isAmbiguous())
     return ExprError();
 
+  if (R.getAsSingle<ParametricExpressionDecl>()) {
+    return ParametricExpressionIdExpr::Create(
+                          Context, NameLoc,
+                          R.getAsSingle<ParametricExpressionDecl>());
+  }
+
   // This could be an implicitly declared function reference (legal in C90,
   // extension in C99, forbidden in C++).
   if (R.empty() && HasTrailingLParen && II && !getLangOpts().CPlusPlus) {
@@ -2694,6 +2700,10 @@ bool Sema::UseArgumentDependentLookup(const CXXScopeSpec &SS,
         return false;
     } else if (!isa<FunctionTemplateDecl>(D))
       return false;
+
+    if (isa<ParametricExpressionDecl>(D)) {
+      return false;
+    }
   }
 
   return true;
@@ -2791,6 +2801,10 @@ ExprResult Sema::BuildDeclarationNameExpr(
     // a template argument list.
     diagnoseMissingTemplateArguments(TemplateName(Template), Loc);
     return ExprError();
+  }
+
+  if (ParametricExpressionDecl *PD = dyn_cast<ParametricExpressionDecl>(D)) {
+    return ParametricExpressionIdExpr::Create(Context, Loc, PD);
   }
 
   // Make sure that we're referring to a value.
@@ -5061,6 +5075,11 @@ static bool isPlaceholderToRemoveAsArg(QualType type) {
   case BuiltinType::Overload:
     return false;
 
+  // ParametricExpressionId can be valid arguments in calls
+  // to parametric expressions
+  case BuiltinType::ParametricExpressionId:
+    return false;
+
   // Unbridged casts in ARC can be handled in some call positions and
   // should be left in place.
   case BuiltinType::ARCUnbridgedCast:
@@ -5305,6 +5324,10 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
   if (Result.isInvalid()) return ExprError();
   Fn = Result.get();
 
+  if (ParametricExpressionIdExpr *PE =
+      dyn_cast<ParametricExpressionIdExpr>(Fn))
+    return ActOnParametricExpressionCallExpr(PE, ArgExprs, LParenLoc);
+
   if (checkArgsForPlaceholders(*this, ArgExprs))
     return ExprError();
 
@@ -5322,6 +5345,7 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
       return new (Context)
           CallExpr(Context, Fn, None, Context.VoidTy, VK_RValue, RParenLoc);
     }
+
     if (Fn->getType() == Context.PseudoObjectTy) {
       ExprResult result = CheckPlaceholderExpr(Fn);
       if (result.isInvalid()) return ExprError();
@@ -15244,6 +15268,12 @@ static void DoMarkVarDeclReferenced(Sema &SemaRef, SourceLocation Loc,
                                     VarDecl *Var, Expr *E) {
   assert((!E || isa<DeclRefExpr>(E) || isa<MemberExpr>(E)) &&
          "Invalid Expr argument to DoMarkVarDeclReferenced");
+
+  // Using parameters are never ODR used
+  // so I think we can skip all of this - JASON
+  if (isa<ParmVarDecl>(Var) && cast<ParmVarDecl>(Var)->isUsingSpecified())
+    return;
+
   Var->setReferenced();
 
   TemplateSpecializationKind TSK = Var->getTemplateSpecializationKind();
@@ -16407,6 +16437,13 @@ ExprResult Sema::CheckPlaceholderExpr(Expr *E) {
     }
     tryToRecoverWithCall(result, PD,
                          /*complain*/ true);
+    return result;
+  }
+
+  // Parametric Expression Ids
+  case BuiltinType::ParametricExpressionId: {
+    ExprResult result = E;
+    Diag(E->getBeginLoc(), diag::err_parametric_expression_id);
     return result;
   }
 

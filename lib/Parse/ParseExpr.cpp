@@ -1803,6 +1803,13 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       }
       ConsumeToken();
       break;
+    case tok::tilde: // postfix-expression '~'
+      if (!LHS.isInvalid()) {
+        LHS = Actions.ActOnPackOpExpr(Tok.getLocation(), LHS.get(),
+                                      NextToken().is(tok::l_paren));
+      }
+      ConsumeToken();
+      break;
     }
   }
 }
@@ -2824,11 +2831,20 @@ bool Parser::ParseExpressionList(SmallVectorImpl<Expr *> &Exprs,
     } else
       Expr = ParseAssignmentExpression();
 
-    if (Tok.is(tok::ellipsis))
+    if (Tok.is(tok::ellipsis)) {
       Expr = Actions.ActOnPackExpansion(Expr.get(), ConsumeToken());
+    }
+
     if (Expr.isInvalid()) {
       SkipUntil(tok::comma, tok::r_paren, StopBeforeMatch);
       SawError = true;
+    } else if (PackExpansionExpr *PE =
+        dyn_cast_or_null<PackExpansionExpr>(Expr.get())){
+        // Parametric expressions can return unexpanded packs
+        // which can be expanded
+        SawError = SawError ||
+                   Actions.TryExpandResolvedPackExpansion(PE, CommaLocs,
+                                                          Exprs);
     } else {
       Exprs.push_back(Expr.get());
     }

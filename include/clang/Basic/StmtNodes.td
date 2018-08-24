@@ -23,6 +23,7 @@ def IndirectGotoStmt : Stmt;
 def ContinueStmt : Stmt;
 def BreakStmt : Stmt;
 def ReturnStmt : Stmt;
+def ParametricExpressionReturnStmt : Stmt;
 def DeclStmt  : Stmt;
 def SwitchCase : Stmt<1>;
 def CaseStmt : DStmt<SwitchCase>;
@@ -92,6 +93,11 @@ def ParenListExpr : DStmt<Expr>;
 def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
+def ParametricExpressionIdExpr : DStmt<Expr>;
+def ParametricExpressionCallExpr : DStmt<Expr>;
+def DependentParametricExpressionCallExpr : DStmt<Expr>;
+def ResolvedUnexpandedPackExpr : DStmt<Expr>;
+def DependentPackOpExpr : DStmt<Expr>;
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;

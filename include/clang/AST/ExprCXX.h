@@ -4791,6 +4791,303 @@ public:
   }
 };
 
+// ParametricExpressionIdExpr - A placeholder for the identifier when invoking
+//                              a ParametricExpression
+class ParametricExpressionIdExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParametricExpressionDecl *DefinitionDecl;
+  Expr *BaseExpr;
+  bool IsPackOpAnnotated;
+
+  ParametricExpressionIdExpr(SourceLocation BL, QualType QT,
+                             ParametricExpressionDecl *D,
+                             Expr* Base = nullptr,
+                             bool IsPackOpAnnotated = false)
+    : Expr(ParametricExpressionIdExprClass, QT, VK_RValue, OK_Ordinary,
+           false, false, false, false),
+      BeginLoc(BL),
+      DefinitionDecl(D),
+      BaseExpr(Base),
+      IsPackOpAnnotated(IsPackOpAnnotated) {}
+
+public:
+  static ParametricExpressionIdExpr *Create(ASTContext &C, SourceLocation BL,
+                                            ParametricExpressionDecl *D,
+                                            Expr* Base = nullptr) {
+    return new (C) ParametricExpressionIdExpr(BL, C.ParametricExpressionIdTy,
+                                              D, Base);
+  }
+
+  ParametricExpressionDecl *getDefinitionDecl() { return DefinitionDecl; }
+
+  Expr *getBaseExpr() { return BaseExpr; };
+
+  void setIsPackOpAnnotated(bool Value = true) {
+    IsPackOpAnnotated = Value;
+  }  
+
+  bool isPackOpAnnotated() {
+    return IsPackOpAnnotated;
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt**>(&BaseExpr), 
+                       reinterpret_cast<Stmt**>(&BaseExpr) + 1);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ParametricExpressionIdExprClass;
+  }
+};
+
+// DependentParametricExpressionCallExpr
+//                                - A call a parametric expression that
+//                                  contains dependent arguments
+//
+//                                  If it returns a pack it will be wrapped
+//                                  in a DependentPackOp so ReturnsPack 
+//                                  ContainsPack is false in this case
+//
+class DependentParametricExpressionCallExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParametricExpressionDecl *TheDecl;
+  Expr *BaseExpr;
+  Stmt **Children; // BaseExpr + CallArgs
+  unsigned NumArgs;
+  bool ReturnsPack;
+
+  friend ParametricExpressionCallExpr;
+
+  DependentParametricExpressionCallExpr(SourceLocation BL, QualType QT,
+                                        ParametricExpressionDecl *D,
+                                        Expr* BaseExpr,
+                                        Stmt** Children, unsigned NumArgs,
+                                        bool ReturnsPack)
+    : Expr(DependentParametricExpressionCallExprClass, QT, VK_RValue,
+           OK_Ordinary, /*TypeDependent*/ true, /*ValueDependent*/ false,
+           /*InstantiationDependent*/ false, /*ContainsPack*/ false),
+      BeginLoc(BL),
+      TheDecl(D),
+      BaseExpr(BaseExpr),
+      Children(Children),
+      NumArgs(NumArgs),
+      ReturnsPack(ReturnsPack) {}
+
+public:
+  ParametricExpressionDecl *getDecl() const {
+    return TheDecl;
+  }
+
+  Expr* getBaseExpr() {
+    return BaseExpr;
+  }
+
+  Expr **getArgs() {
+    if (BaseExpr)
+      return reinterpret_cast<Expr**>(Children) + 1;
+    else
+      return reinterpret_cast<Expr**>(Children);
+  }
+
+  unsigned getNumArgs() const { return NumArgs; }
+
+  bool getReturnsPack() const { return ReturnsPack; }
+
+  // Iterators
+  child_range children() {
+    if (BaseExpr)
+      return child_range(Children, Children + NumArgs + 1);
+    else
+      return child_range(Children, Children + NumArgs);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == DependentParametricExpressionCallExprClass;
+  }
+};
+
+// ParametricExpressionCallExpr - A compound statement with RAII scope that
+//                                evaluates as an expression based on its
+//                                return value
+//
+class ParametricExpressionCallExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParmVarDecl** ParamInfo;
+  CompoundStmt *Body;
+  Expr **Args;
+  unsigned NumParams = 0;
+
+  ParametricExpressionCallExpr(SourceLocation BL,
+                               QualType QT, ExprValueKind VK)
+    : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
+           false, false, false, false),
+      BeginLoc(BL) {}
+public:
+  static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
+                                              CompoundStmt *B,
+                                              QualType QT, ExprValueKind VK,
+                                              ArrayRef<ParmVarDecl *> Params);
+
+  static DependentParametricExpressionCallExpr *
+  CreateDependent(ASTContext &C, SourceLocation BL, ParametricExpressionDecl *D,
+                  Expr* BaseExpr, ArrayRef<Expr *> CallArgs,
+                  bool ReturnsPack = false);
+
+  static bool hasDependentArgs(ArrayRef<Expr *> Args);
+
+  CompoundStmt *getBody() const {
+    return Body;
+  }
+
+  void setBody(CompoundStmt *B) {
+    Body = B;
+  }
+
+  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
+  unsigned getNumParams() const { return NumParams; }
+
+  // ArrayRef interface to parameters.
+  ArrayRef<ParmVarDecl *> parameters() const {
+    return {ParamInfo, getNumParams()};
+  }
+  MutableArrayRef<ParmVarDecl *> parameters() {
+    return {ParamInfo, getNumParams()};
+  }
+
+  ArrayRef<Expr *> init_expressions() const {
+    return {Args, NumParams};
+  }
+  MutableArrayRef<Expr *> init_expressions() {
+    return {Args, NumParams};
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt**>(Args),
+                       reinterpret_cast<Stmt**>(Args) + NumParams);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ParametricExpressionCallExprClass;
+  }
+};
+
+class ResolvedUnexpandedPackExpr : public Expr {
+  SourceLocation BeginLoc;
+  Expr **Exprs;
+  unsigned NumExprs = 0;
+
+  ResolvedUnexpandedPackExpr(SourceLocation BL, QualType QT)
+      : Expr(ResolvedUnexpandedPackExprClass, QT, VK_RValue,
+             OK_Ordinary, /*TypeDependent=*/true,
+             /*ValueDependent=*/true, /*InstantiationDependent=*/true,
+             /*ContainsUnexpandedParameterPack=*/true),
+        BeginLoc(BL) {}
+
+public:
+  static ResolvedUnexpandedPackExpr *Create(ASTContext &C,
+                                            SourceLocation BeginLoc,
+                                            QualType T,
+                                            ArrayRef<Expr*> Exprs);
+
+  unsigned getNumExprs() const {
+    return NumExprs;
+  }
+  Expr **getExprs() {
+    return Exprs;
+  }
+  Expr *getExpansion(unsigned Idx) {
+    return Exprs[Idx];
+  }
+  const Expr *getExpansion(unsigned Idx) const {
+    return Exprs[Idx];
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt**>(Exprs),
+                       reinterpret_cast<Stmt**>(Exprs) + NumExprs);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ResolvedUnexpandedPackExprClass;
+  }
+};
+
+// DependentPackOpExpr - An dependent expression with a postfix tilde that
+//                       indicates the expression results in a pack.
+//
+//                       All of these will resolve to a transparent parametric
+//                       expression call which will transform to a
+//                       ResolvedPackExpr
+//
+//                       This can be via a named parametric expression call or
+//                       a member operator `operator()~`
+//                       e.g. foo~()
+//                            obj~
+//
+class DependentPackOpExpr : public Expr {
+  // SubExpr - LHS which may be a parametric expression id or
+  //           an object implementing `operator()~` (postfix tilde)
+  Expr *SubExpr;
+  SourceLocation TildeLoc;
+  bool HasTrailingLParen;
+
+  DependentPackOpExpr(Expr *E, SourceLocation TL, bool HasTrailingLParen)
+    : Expr(DependentPackOpExprClass, E->getType(), E->getValueKind(), OK_Ordinary,
+           E->isTypeDependent(), E->isValueDependent(),
+           E->isInstantiationDependent(),
+           /*ContainsExpandedParameterPack=*/true),
+      SubExpr(E),
+      TildeLoc(TL),
+      HasTrailingLParen(HasTrailingLParen) {}
+
+public:
+  static DependentPackOpExpr *Create(ASTContext& C, Expr *SubExpr,
+                                     SourceLocation TLoc,
+                                     bool HasTrailingLParen);
+
+  Expr *getSubExpr() { return SubExpr; }
+  SourceLocation getTildeLoc() const { return TildeLoc; }
+
+  // It may resolve to a parametric expression call
+  // that is to return a pack so info about the trailing
+  // l_paren is retained to enforce that
+  bool hasTrailingLParen() const {
+    return HasTrailingLParen;
+  }
+    
+  // Iterators
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt**>(&SubExpr), 
+                       reinterpret_cast<Stmt**>(&SubExpr) + 1);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY {
+    return SubExpr->getBeginLoc();
+  }
+  SourceLocation getEndLoc() const LLVM_READONLY {
+    return SubExpr->getEndLoc();
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == DependentPackOpExprClass;
+  }
+};
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_EXPRCXX_H

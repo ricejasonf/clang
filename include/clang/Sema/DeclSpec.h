@@ -366,6 +366,9 @@ private:
   // constexpr-specifier
   unsigned Constexpr_specified : 1;
 
+  // using-specifier (for parametric expression param)
+  unsigned Using_specified : 1;
+
   union {
     UnionParsedType TypeRep;
     Decl *DeclRep;
@@ -395,7 +398,7 @@ private:
       TQ_unalignedLoc;
   SourceLocation FS_inlineLoc, FS_virtualLoc, FS_explicitLoc, FS_noreturnLoc;
   SourceLocation FS_forceinlineLoc;
-  SourceLocation FriendLoc, ModulePrivateLoc, ConstexprLoc;
+  SourceLocation FriendLoc, ModulePrivateLoc, ConstexprLoc, UsingLoc;
   SourceLocation TQ_pipeLoc;
 
   WrittenBuiltinSpecs writtenBS;
@@ -442,6 +445,7 @@ public:
       FS_noreturn_specified(false),
       Friend_specified(false),
       Constexpr_specified(false),
+      Using_specified(false),
       Attrs(attrFactory),
       writtenBS(),
       ObjCQualifiers(nullptr) {
@@ -712,6 +716,9 @@ public:
   bool SetConstexprSpec(SourceLocation Loc, const char *&PrevSpec,
                         unsigned &DiagID);
 
+  bool SetUsingSpec(SourceLocation Loc, const char *&PrevSpec,
+                    unsigned &DiagID);
+
   bool isFriendSpecified() const { return Friend_specified; }
   SourceLocation getFriendSpecLoc() const { return FriendLoc; }
 
@@ -720,6 +727,9 @@ public:
 
   bool isConstexprSpecified() const { return Constexpr_specified; }
   SourceLocation getConstexprSpecLoc() const { return ConstexprLoc; }
+
+  bool isUsingSpecified() const { return Using_specified; }
+  SourceLocation getUsingSpecLoc() const { return UsingLoc; }
 
   void ClearConstexprSpec() {
     Constexpr_specified = false;
@@ -1745,7 +1755,9 @@ enum class DeclaratorContext {
     TemplateArgContext,  // Any template argument (in template argument list).
     TemplateTypeArgContext, // Template type argument (in default argument).
     AliasDeclContext,    // C++11 alias-declaration.
-    AliasTemplateContext // C++11 alias-declaration template.
+    AliasTemplateContext, // C++11 alias-declaration template.
+    ParametricExpressionContext, // C++2a parametric expression declarator
+    ParametricExpressionParameterContext // C++2a parametric expression parameter declarator
 };
 
 
@@ -1972,6 +1984,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return true;
     }
     llvm_unreachable("unknown context kind!");
@@ -1994,6 +2008,7 @@ public:
     case DeclaratorContext::TemplateParamContext:
     case DeclaratorContext::CXXCatchContext:
     case DeclaratorContext::ObjCCatchContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return true;
 
     case DeclaratorContext::TypeNameContext:
@@ -2010,6 +2025,7 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2052,6 +2068,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2107,6 +2125,8 @@ public:
     case DeclaratorContext::TemplateArgContext:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2328,6 +2348,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2361,6 +2383,8 @@ public:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
     case DeclaratorContext::TemplateTypeArgContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
 
     case DeclaratorContext::BlockContext:

@@ -2883,6 +2883,15 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
             T, QualType(CorrespondingTemplateParam->getTypeForDecl(), 0));
       }
       break;
+    case DeclaratorContext::ParametricExpressionContext:
+      // not sure anything is needed here
+      break;
+    case DeclaratorContext::ParametricExpressionParameterContext:
+      // Parametric Expression requires `auto` as a constraint
+      if (!SemaRef.getLangOpts().CPlusPlus2a ||
+          !Auto || Auto->getKeyword() != AutoTypeKeyword::Auto)
+        Error = 21; // in parametric expression parameter
+      break;
     case DeclaratorContext::MemberContext: {
       if (D.getDeclSpec().getStorageClassSpec() == DeclSpec::SCS_static ||
           D.isFunctionDeclarator())
@@ -3045,6 +3054,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::InitStmtContext:
     case DeclaratorContext::BlockLiteralContext:
     case DeclaratorContext::LambdaExprContext:
+    case DeclaratorContext::ParametricExpressionContext:
       // C++11 [dcl.type]p3:
       //   A type-specifier-seq shall not define a class or enumeration unless
       //   it appears in the type-id of an alias-declaration (7.1.3) that is not
@@ -3067,6 +3077,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
       break;
     case DeclaratorContext::PrototypeContext:
     case DeclaratorContext::LambdaExprParameterContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
     case DeclaratorContext::ObjCParameterContext:
     case DeclaratorContext::ObjCResultContext:
     case DeclaratorContext::KNRTypeListContext:
@@ -4079,6 +4090,8 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TypeNameContext:
     case DeclaratorContext::FunctionalCastContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       // Don't infer in these contexts.
       break;
     }
@@ -4969,6 +4982,21 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         T = Context.getPackExpansionType(T, None);
       }
       break;
+    case DeclaratorContext::ParametricExpressionParameterContext: {
+      ParametricExpressionDecl* PD = S.getCurParametricExpressionDecl();
+      assert(PD && "ParametricExpression context must be on the stack.");
+      unsigned TemplateDepth = PD->getTemplateDepth();
+      TemplateTypeParmDecl *DummyTemplateParam =
+          TemplateTypeParmDecl::Create(
+              S.Context, S.Context.getTranslationUnitDecl(),
+              /*KeyLoc*/ SourceLocation(), /*NameLoc*/ D.getBeginLoc(),
+              TemplateDepth, /*AutoParameterPosition*/ 0,
+              /*Identifier*/ nullptr, false, /*IsParameterPack*/ true);
+      T = Context.getPackExpansionType(
+                          QualType(DummyTemplateParam->getTypeForDecl(), 0),
+                          None);
+      break;
+    }
     case DeclaratorContext::TemplateParamContext:
       // C++0x [temp.param]p15:
       //   If a template-parameter is a [...] is a parameter-declaration that
@@ -5007,6 +5035,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::ObjCCatchContext:
     case DeclaratorContext::BlockLiteralContext:
     case DeclaratorContext::LambdaExprContext:
+    case DeclaratorContext::ParametricExpressionContext:
     case DeclaratorContext::ConversionIdContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
@@ -5019,6 +5048,38 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       D.setEllipsisLoc(SourceLocation());
       break;
     }
+  }
+
+  // Validate parametric expression param
+  if (D.getContext() == DeclaratorContext::ParametricExpressionParameterContext &&
+      !D.hasEllipsis()) {
+    // This might not be the correct place to check these
+    if (T.isLocalVolatileQualified()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+    if (T.isLocalRestrictQualified()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+    // this is a hack
+    if (T->isReferenceType() || T->isPointerType()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+
+    // "Apply constraint"
+    AutoType* A = T->getContainedAutoType();
+    if (!A) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_requires_constraint);
+      D.setInvalidType(true);
+    }
+
+    // Make the type "dependent"
+    unsigned IsConst = T.isConstQualified();
+    T = S.Context.DependentTy;
+    if (IsConst)
+      T.addConst();
   }
 
   assert(!T.isNull() && "T must not be null at the end of this function");

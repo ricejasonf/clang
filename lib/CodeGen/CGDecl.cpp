@@ -93,6 +93,7 @@ void CodeGenFunction::EmitDecl(const Decl &D) {
   case Decl::ConstructorUsingShadow:
   case Decl::ObjCTypeParam:
   case Decl::Binding:
+  case Decl::ParametricExpression:
     llvm_unreachable("Declaration should not be in declstmts!");
   case Decl::Function:  // void X();
   case Decl::Record:    // struct/union/class X;

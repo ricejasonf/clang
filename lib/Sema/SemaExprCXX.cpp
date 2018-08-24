@@ -35,6 +35,7 @@
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaLambda.h"
+#include "clang/Sema/Template.h"
 #include "clang/Sema/TemplateDeduction.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
@@ -7330,7 +7331,11 @@ ExprResult Sema::IgnoredValueConversions(Expr *E) {
 //        delete, lambda-expr, dynamic-cast, reinterpret-cast etc...
 static inline bool VariableCanNeverBeAConstantExpression(VarDecl *Var,
     ASTContext &Context) {
-  if (isa<ParmVarDecl>(Var)) return true;
+  if (isa<ParmVarDecl>(Var)) {
+    if(cast<ParmVarDecl>(Var)->isUsingSpecified())
+      return false;
+    return true;
+  }
   const VarDecl *DefVD = nullptr;
 
   // If there is no initializer - this can not be a constant expression.
@@ -7903,4 +7908,428 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
     return IER_Error;
 
   return CheckMicrosoftIfExistsSymbol(S, SS, TargetNameInfo);
+}
+
+namespace {
+// This is used to deduce the return type for a parametric expression.
+class ParametricExpressionReturnStmtVisitor
+  : public RecursiveASTVisitor<ParametricExpressionReturnStmtVisitor> {
+
+  Sema &SemaRef;
+  QualType ResultType;
+  bool HasError = false;
+
+public:
+  ParametricExpressionReturnStmtVisitor(Sema &S)
+    : SemaRef(S), ResultType() {}
+
+  QualType getResultType() {
+    return ResultType;
+  }
+
+  bool hasError() {
+    return HasError;
+  }
+
+  bool VisitParametricExpressionReturnStmt(ParametricExpressionReturnStmt *RS) {
+    if (RS->isUnreachable())
+      return true;
+
+    Expr *RE = RS->getRetValue();
+
+    // If this wasn't a raw AST transformation we
+    // don't return crazy stuff like unexpanded packs
+    if (SemaRef.DiagnoseUnexpandedParameterPack(RE))
+      HasError = true;
+    if (RE->getType()->isPlaceholderType()) {
+      SemaRef.CheckPlaceholderExpr(RE);
+      HasError = true;
+    }
+
+    QualType CurrentResultType{};
+    if (RE) {
+      CurrentResultType = SemaRef.BuildDecltypeType(RS->getRetValue(),
+                                     RS->getRetValue()->getBeginLoc(),
+                                     /*AsUnevaluated=*/false);
+    } else {
+      CurrentResultType = SemaRef.Context.VoidTy;
+    }
+
+    if (ResultType.isNull() || ResultType->isDependentType()) {
+      ResultType = CurrentResultType;
+    } else if (
+        SemaRef.Context.getCanonicalType(ResultType)
+     != SemaRef.Context.getCanonicalType(CurrentResultType)) {
+      SemaRef.Diag(RS->getReturnLoc(), diag::err_auto_fn_different_deductions)
+        << 1 // decltype(auto)
+        << CurrentResultType << ResultType;
+    }
+
+    return true;
+  }
+
+  // Don't visit enclosed scopes
+
+  bool VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
+    return true;
+  }
+};
+} // end anon namespace
+
+ExprResult Sema::ActOnParametricExpressionCallExpr(
+                                              ParametricExpressionIdExpr *Id,
+                                                ArrayRef<Expr*> CallArgExprs,
+                                                    SourceLocation LParenLoc) {
+  assert(isa<ParametricExpressionIdExpr>(Id) &&
+      "Expecting only ParametricExpressionIdExpr right now");
+  ParametricExpressionDecl *D =
+    static_cast<ParametricExpressionIdExpr*>(Id)->getDefinitionDecl();
+  Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Id)->getBaseExpr();
+
+  if (!BaseExpr && D->isCXXInstanceMember()) {
+    Diag(LParenLoc, diag::err_member_call_without_object)
+      << Id->getSourceRange();
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+    return ExprError();
+  }
+
+  return ActOnParametricExpressionCallExpr(D, BaseExpr, CallArgExprs,
+                                           LParenLoc,
+                                           Id->isPackOpAnnotated());
+}
+
+ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
+                                                   Expr *BaseExpr,
+                                                   ArrayRef<Expr*> CallArgExprs,
+                                                   SourceLocation Loc,
+                                                   bool ReturnsPack) {
+  if (ReturnsPack && !D->isPackOp()) {
+    Diag(Loc, diag::err_parametric_expression_not_pack_op);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+  } else if (!ReturnsPack && D->isPackOp()) {
+    Diag(Loc, diag::err_parametric_expression_is_pack_op);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+  }
+
+  // Defer instantiation if the args are dependent
+  // This includes any unexpanded parameter pack
+  if (ParametricExpressionCallExpr::hasDependentArgs(CallArgExprs)) {
+    ExprResult Dep = ParametricExpressionCallExpr::CreateDependent(
+                                                        Context,
+                                                        Loc, D,
+                                                        BaseExpr,
+                                                        CallArgExprs,
+                                                        ReturnsPack);
+    if (ReturnsPack && Dep.isUsable()) {
+      return ActOnPackOpExpr(Loc, Dep.get(), /*HasTrailingLParen=*/true);
+    }
+    return Dep;
+  }
+
+  ArrayRef<ParmVarDecl *> OldParams = D->parameters();
+
+  Stmt *Output = D->getBody();
+  if (!Output) {
+    // This is an error but just assume that we have an empty body
+    Output = CompoundStmt::CreateEmpty(Context, /*NumStmts=*/0);
+  }
+
+  LocalInstantiationScope Scope(*this, /*CombineWithOuterScope=*/true);
+  InstantiatingTemplate Inst(*this, Loc, D);
+
+  llvm::SmallVector<Expr*, 16> ArgExprs;
+  // reserve enough for possible BaseExpr
+  ArgExprs.reserve(CallArgExprs.size() + 1);
+  if (BaseExpr && !D->isStatic())
+    ArgExprs.push_back(BaseExpr);
+  for (Expr *E : CallArgExprs)
+    ArgExprs.push_back(E);
+
+
+  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls;
+  NewParmVarDecls.reserve(ArgExprs.size() + 1);
+
+  // We already know there is at most one param pack
+  int PackSize = ArgExprs.size() - OldParams.size() + 1;
+  int PackCount = (std::find_if(OldParams.begin(),
+                                OldParams.end(),
+                                [](ParmVarDecl* PD) {
+                                  return PD->isParameterPack(); })
+                  != OldParams.end()) ? 1 : 0;
+
+  // If PackSize is negative then there must not be a param pack
+  // Or the user gave us an invalid arity
+  if ((PackCount == 1 && PackSize < 0) ||
+      (PackCount == 0 && ArgExprs.size() != OldParams.size())) {
+    Diag(Loc, diag::err_parametric_expression_arg_list_different_arity)
+      << (((PackCount == 1) || ArgExprs.size() > OldParams.size()) ? 1 : 0);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+    return ExprError();
+  }
+
+  auto ArgExprsItr = ArgExprs.begin();
+
+  for (ParmVarDecl *P : OldParams) {
+    if (P->isParameterPack()) {
+      assert(PackSize >= 0 && "Pack size is negative!");
+
+      Scope.MakeInstantiatedLocalArgPack(P);
+      for (int J = 0; J < PackSize; ++J) {
+        assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
+        ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
+        if (!New) return ExprError();
+        Scope.InstantiatedLocalPackArg(P, New);
+        NewParmVarDecls.push_back(New);
+        ++ArgExprsItr;
+      }
+    } else {
+      assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
+      ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
+      if (!New) return ExprError();
+      Scope.InstantiatedLocal(P, New);
+      NewParmVarDecls.push_back(New);
+      ++ArgExprsItr;
+    }
+  }
+
+  TemplateArgumentList Innermost(TemplateArgumentList::OnStack, {});
+  MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
+                                                                D, &Innermost);
+
+  // Instantiate the body
+  if (CompoundStmt::classof(Output)) {
+    PushFunctionScope();
+    StmtResult CSResult = SubstStmt(Output, TemplateArgs);
+    PopFunctionScopeInfo();
+    if (CSResult.isInvalid())
+      return ExprError();
+
+    return BuildParametricExpressionCallExpr(Loc,
+                                             CSResult.getAs<CompoundStmt>(),
+                                             NewParmVarDecls);
+  } else {
+    Expr *OutputExpr = cast<Expr>(Output);
+    // Raw transformation with no AST wrapper
+
+    if (ReturnsPack && !isa<DependentPackOpExpr>(OutputExpr)) {
+      assert(OutputExpr->containsUnexpandedParameterPack() &&
+        "parametric expression does not return pack but a pack was found");
+      return BuildResolvedUnexpandedPackExpr(Loc, OutputExpr, TemplateArgs);
+    }
+    // Raw transformation with no AST wrapper
+    return SubstExpr(OutputExpr, TemplateArgs);
+  }
+}
+
+ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
+                                             CompoundStmt *Body,
+                                             ArrayRef<ParmVarDecl *> Params) {
+  // Assume type dependence if there is value dependent arguments
+  ExprValueKind VK;
+  QualType T;
+
+  // The Body is not instantiated until all args are non-dependent
+  // (ie value-dependent)
+  ParametricExpressionReturnStmtVisitor R(*this);
+  R.TraverseStmt(Body);
+
+  if (R.hasError())
+    return ExprError();
+
+  T = R.getResultType();
+
+  // Default to returning `void`
+  if (T.isNull())
+    T = Context.VoidTy;
+
+  if (T->isLValueReferenceType()) {
+    VK = VK_LValue;
+  } else if (T->isRValueReferenceType()) {
+    VK = T->isFunctionType() ? VK_LValue : VK_XValue;
+  } else {
+    VK =  VK_RValue;
+  }
+
+  T = T.getNonReferenceType();
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc,
+                                              Body, T, VK, Params);
+}
+
+// used in ActOnParametricExpression and
+// TreeTransform<Derived>::TransformParametricExpressionCallExpr
+ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
+                                                  Expr *ArgExpr) {
+  QualType ArgTy;
+  if (!ArgExpr) {
+    ArgTy = Old->getType();
+  } else if (Old->isConstexpr()) {
+    ArgTy = Context.getAutoType(QualType(), AutoTypeKeyword::Auto,
+                              /*IsDependent=*/false);
+    TypeLocBuilder TLB;
+    TLB.pushTypeSpec(ArgTy).setNameLoc(Old->getBeginLoc());
+    TypeSourceInfo *TSI = TLB.getTypeSourceInfo(Context, ArgTy);
+
+    ArgTy = deduceVarTypeFromInitializer(
+      Old, Old->getDeclName(), ArgTy, TSI,
+      Old->getSourceRange(), /*DirectInit=*/false, ArgExpr);
+  } else if (Old->isUsingSpecified()) {
+    // using params have the same type as the argument
+    ArgTy = ArgExpr->getType();
+  } else if (ArgExpr->getType()->isPlaceholderType()) {
+    CheckPlaceholderExpr(ArgExpr);
+    return nullptr;
+  } else if (ArgExpr->isLValue()) {
+    ArgTy = Context.getLValueReferenceType(ArgExpr->getType());
+  } else {
+    ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
+  }
+
+  // maintain constness
+  if (Old->getType().isConstQualified())
+    ArgTy.addConst();
+
+  TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(ArgTy);
+  ParmVarDecl *New = ParmVarDecl::Create(Context,
+                                         CurContext,
+                                         Old->getInnerLocStart(),
+                                         Old->getLocation(),
+                                         Old->getIdentifier(),
+                                         NewDI->getType(), NewDI,
+                                         Old->getStorageClass(),
+                                         /* DefArg */ nullptr);
+  New->setConstexpr(Old->isConstexpr());
+
+  if (ArgExpr && !Old->isUsingSpecified()) {
+    ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
+    if (InitExprResult.isInvalid())
+      return nullptr;
+    AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
+    assert((ArgExpr->getType()->isDependentType() ||
+           !New->getType()->isDependentType()) &&
+          "Param with non-dependent init should not be dependent");
+  } else {
+    // Using Params can contain things like packs and overloaded function ids
+    New->setUsingSpecified(Old->isUsingSpecified());
+    New->setInit(ArgExpr);
+  }
+  return New;
+}
+
+ExprResult Sema::BuildResolvedUnexpandedPackExpr(
+                                SourceLocation BeginLoc, Expr* Pattern, 
+                                MultiLevelTemplateArgumentList TemplateArgs) {
+  bool ShouldExpand = true;
+  bool RetainExpansion = false;
+  Optional<unsigned> NumExpansions = None;
+  SmallVector<UnexpandedParameterPack, 2> Unexpanded;
+  SmallVector<Expr*, 12> ResultExprs;
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  // Resolve any DependentPackOpExprs
+
+  for (UnexpandedParameterPack& UP : Unexpanded) {
+    if (auto *DP = UP.first.dyn_cast<DependentPackOpExpr*>()) {
+      ExprResult Result = SubstExpr(DP, TemplateArgs);
+      if (Result.isInvalid())
+        return ExprError();
+      // Well I hope we can mutate these things
+      assert(isa<ResolvedUnexpandedPackExpr>(Result.get()) &&
+        "DependentPackOp not resolved properly");
+      UP.first = Result.getAs<ResolvedUnexpandedPackExpr>();
+    }
+  }
+
+  if (CheckParameterPacksForExpansion(BeginLoc, Pattern->getSourceRange(),
+                                     Unexpanded, TemplateArgs, ShouldExpand,
+                                     RetainExpansion, NumExpansions))
+    return ExprError();
+
+
+  // Actually expand
+
+  assert(ShouldExpand && "Resolved pack should be resolved");
+  for (unsigned I = 0; I != *NumExpansions; ++I) {
+    Sema::ArgumentPackSubstitutionIndexRAII SubstIndex(*this, I);
+    // Is there overhead calling it externally like this?
+    ExprResult Out = SubstExpr(Pattern, TemplateArgs);
+    if (Out.isInvalid())
+      return ExprError();
+
+    assert(!Out.get()->containsUnexpandedParameterPack() &&
+           "Resolved pack contains nested pack");
+
+    ResultExprs.push_back(Out.get());
+  }
+
+
+  // Create the ResolvedUnexpandedPackExpr
+
+  TemplateTypeParmDecl *DummyTemplateParam =
+      TemplateTypeParmDecl::Create(
+          Context, Context.getTranslationUnitDecl(),
+          /*KeyLoc*/ SourceLocation(), /*NameLoc*/ SourceLocation(),
+          /*TemplateDepth*/ 0, /*AutoParameterPosition*/ 0,
+          /*Identifier*/ nullptr, false, /*IsParameterPack*/ true);
+
+  QualType T = Context.getPackExpansionType(
+                      QualType(DummyTemplateParam->getTypeForDecl(), 0),
+                      ResultExprs.size());
+  return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, T, ResultExprs);
+}
+
+ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
+                                 bool HasTrailingLParen) {
+  if (DiagnoseUnexpandedParameterPack(SubExpr, UPPC_PackOp)) {
+    return ExprError();
+  }
+
+  if (auto *Id = dyn_cast<ParametricExpressionIdExpr>(SubExpr)) {
+    Id->setIsPackOpAnnotated();
+    // Must be a part of call
+    if (!HasTrailingLParen) {
+      Diag(TildeLoc,
+           diag::err_parametric_expression_postfix_tilde_not_call);
+      return ExprError();
+    }
+
+    return Id;
+  } 
+
+  // Check all dependence factors that parametric expressions use
+  if (SubExpr->isTypeDependent() ||
+      SubExpr->isValueDependent() ||
+      SubExpr->isInstantiationDependent()) {
+    return DependentPackOpExpr::Create(Context, SubExpr, TildeLoc,
+                                       HasTrailingLParen);
+  }
+
+  CXXRecordDecl *Record = SubExpr->getType()->getAsCXXRecordDecl();
+  if (!Record) {
+    Diag(TildeLoc, diag::err_typecheck_unary_expr)
+      << SubExpr->getType();
+    return ExprError();
+  }
+
+  // The record must have a member `operator~~`.
+  // Look it up it and call it
+  DeclarationNameInfo OpName = DeclarationNameInfo(
+    Context.DeclarationNames.getCXXOperatorName(OO_PostfixTilde),
+    TildeLoc);
+  LookupResult R(*this, OpName, LookupOrdinaryName);
+  LookupQualifiedName(R, Record);
+  auto *D = R.getAsSingle<ParametricExpressionDecl>();
+
+  if (!D) {
+    // Lookup handles the diagnostics
+    Diag(TildeLoc, diag::err_no_member_pack_operator)
+      << Record;
+    return ExprError();
+  }
+
+  return ActOnParametricExpressionCallExpr(D, SubExpr, {}, TildeLoc,
+                                         /*ReturnsPack=*/true);
 }

@@ -221,6 +221,15 @@ void ASTStmtWriter::VisitReturnStmt(ReturnStmt *S) {
   Code = serialization::STMT_RETURN;
 }
 
+void ASTStmtWriter::VisitParametricExpressionReturnStmt(
+            ParametricExpressionReturnStmt *S) {
+  VisitStmt(S);
+  Record.AddStmt(S->getRetValue());
+  Record.AddSourceLocation(S->getReturnLoc());
+  Record.AddDeclRef(S->getNRVOCandidate());
+  Code = serialization::STMT_PARAMETRIC_EXPRESSION_RETURN;
+}
+
 void ASTStmtWriter::VisitDeclStmt(DeclStmt *S) {
   VisitStmt(S);
   Record.AddSourceLocation(S->getBeginLoc());
@@ -1716,6 +1725,35 @@ void ASTStmtWriter::VisitTypoExpr(TypoExpr *E) {
   // TODO: Figure out sane writer behavior for a TypoExpr, if necessary
   llvm_unreachable("Cannot write TypoExpr nodes");
 }
+
+void ASTStmtWriter::VisitParametricExpressionIdExpr(
+                                    ParametricExpressionIdExpr *E) {
+  // TODO JASON no idea if this is enough
+  llvm_unreachable("Cannot write ParametricExpressionIdExpr nodes");
+  VisitExpr(E);
+  Record.AddSourceLocation(E->getBeginLoc());
+}
+
+void ASTStmtWriter::VisitParametricExpressionCallExpr(
+                                  ParametricExpressionCallExpr *E) {
+  llvm_unreachable("Cannot write ParametricExpressionCallExpr nodes");
+}
+
+void ASTStmtWriter::VisitDependentParametricExpressionCallExpr(
+                         DependentParametricExpressionCallExpr *E) {
+  llvm_unreachable("Cannot write DependentParametricExpressionCallExpr nodes");
+}
+
+void ASTStmtWriter::VisitResolvedUnexpandedPackExpr(
+                                    ResolvedUnexpandedPackExpr *S) {
+  llvm_unreachable("Cannot write ResolvedUnexpandedPackExpr nodes");
+}
+
+void ASTStmtWriter::VisitDependentPackOpExpr(
+                                           DependentPackOpExpr *S) {
+  llvm_unreachable("Cannot write DependentPackOpExpr nodes");
+}
+
 
 //===----------------------------------------------------------------------===//
 // CUDA Expressions and Statements.

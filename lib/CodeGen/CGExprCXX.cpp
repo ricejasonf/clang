@@ -2269,3 +2269,51 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
     }
   }
 }
+
+Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
+                                    const ParametricExpressionCallExpr* E,
+                                    AggValueSlot AggSlot) {
+  ParametricExpressionCallExprScope PScope(*this);
+
+  QualType RetTy = E->getType();
+  CompoundStmt *Body = E->getBody();
+
+  /*
+  PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body->getBeginLoc(),
+                             "LLVM IR generation of parametric expression call ('{}')");
+  */
+
+  LexicalScope Scope(*this, Body->getSourceRange());
+  ReturnBlock = getJumpDestInCurrentScope("pe.return");
+
+  if (!AggSlot.isIgnored()) {
+    ReturnValue = AggSlot.getAddress();
+  } else {
+    ReturnValue = CreateMemTemp(RetTy);
+  }
+
+  for (ParmVarDecl* PD : E->parameters()) {
+    if (!PD->isUsingSpecified() && !(PD->isConstexpr() && !PD->getDeclName())) {
+      EmitAutoVarDecl(*PD);
+    }
+  }
+
+  EmitCompoundStmtWithoutScope(*Body);
+  EmitReturnBlock();
+
+  return ReturnValue;
+}
+
+RValue CodeGenFunction::EmitParametricExpressionCallExpr(
+                                      const ParametricExpressionCallExpr* E,
+                                      AggValueSlot AggSlot) {
+  Address ResultAddr = EmitParametricExpressionCallExprInternal(E, AggSlot);
+  return convertTempToRValue(ResultAddr, E->getType(), E->getBeginLoc());
+}
+
+LValue CodeGenFunction::EmitParametricExpressionCallExprLValue(
+                                      const ParametricExpressionCallExpr* E) {
+  Address ResultAddr = EmitParametricExpressionCallExprInternal(E,
+                                                    AggValueSlot::ignored());
+  return MakeAddrLValue(ResultAddr, E->getType());
+}

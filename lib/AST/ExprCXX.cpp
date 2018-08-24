@@ -1449,3 +1449,109 @@ TypeTraitExpr *TypeTraitExpr::CreateDeserialized(const ASTContext &C,
 }
 
 void ArrayTypeTraitExpr::anchor() {}
+
+
+ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
+                                        ASTContext &C, SourceLocation BL,
+                                        CompoundStmt *Body,
+                                        QualType QT, ExprValueKind VK,
+                                        ArrayRef<ParmVarDecl *> Params) {
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(
+                                                                BL, QT, VK);
+  New->NumParams = Params.size();
+
+  if (!Params.empty()) {
+    New->ParamInfo = new (C) ParmVarDecl*[Params.size()];
+    std::copy(Params.begin(), Params.end(), New->ParamInfo);
+  }
+
+  New->Args = new (C) Expr*[Params.size()];
+
+  New->Body = Body;
+  for (unsigned I = 0; I < Params.size(); ++I) {
+    New->Args[I] = Params[I]->getInit();
+    if (New->Args[I]->containsUnexpandedParameterPack())
+      New->setContainsUnexpandedParameterPack(true);
+  }
+
+  return New;
+}
+
+DependentParametricExpressionCallExpr *
+ParametricExpressionCallExpr::CreateDependent(
+                                        ASTContext &C, SourceLocation BL,
+                                        ParametricExpressionDecl *D,
+                                        Expr* BaseExpr,
+                                        ArrayRef<Expr *> CallArgs,
+                                        bool ReturnsPack) {
+  Stmt** Children;
+  if (BaseExpr) {
+    Children = new (C) Stmt*[CallArgs.size() + 1];
+    Children[0] = BaseExpr;
+    std::copy(CallArgs.begin(), CallArgs.end(), Children + 1);
+  } else if (!CallArgs.empty()) {
+    Children = new (C) Stmt*[CallArgs.size()];
+    std::copy(CallArgs.begin(), CallArgs.end(), Children);
+  }
+
+  DependentParametricExpressionCallExpr *
+  New = new (C) DependentParametricExpressionCallExpr(BL, C.DependentTy, D,
+                                                      BaseExpr, Children,
+                                                      CallArgs.size(),
+                                                      ReturnsPack);
+
+  for (unsigned I = 0; I < CallArgs.size(); ++I) {
+    if (CallArgs[I]->isValueDependent())
+      New->setValueDependent(true);
+    if (CallArgs[I]->isInstantiationDependent())
+      New->setInstantiationDependent(true);
+    if (CallArgs[I]->containsUnexpandedParameterPack())
+      New->setContainsUnexpandedParameterPack(true);
+  }
+
+  return New;
+}
+
+bool ParametricExpressionCallExpr::hasDependentArgs(ArrayRef<Expr *> Args) {
+  for (unsigned I = 0; I < Args.size(); ++I) {
+    if (Args[I]->isTypeDependent() ||
+        Args[I]->isValueDependent() ||
+        Args[I]->isInstantiationDependent() ||
+        Args[I]->containsUnexpandedParameterPack())
+      return true;
+  }
+
+  return false;
+}
+
+ResolvedUnexpandedPackExpr *
+ResolvedUnexpandedPackExpr::Create(ASTContext &C, SourceLocation BL,
+                                   QualType T, ArrayRef<Expr*> Exprs) {
+#ifndef NDEBUG
+  for (auto *E : Exprs)
+    assert(!E->containsUnexpandedParameterPack() &&
+           "Pack of packs are not allowed");
+#endif
+
+  ResolvedUnexpandedPackExpr *
+  New = new (C) ResolvedUnexpandedPackExpr(BL, T);
+
+  New->NumExprs = Exprs.size();
+
+  if (!Exprs.empty()) {
+    New->Exprs = new (C) Expr*[Exprs.size()];
+    std::copy(Exprs.begin(), Exprs.end(), New->Exprs);
+  }
+
+  return New;
+}
+
+DependentPackOpExpr *
+DependentPackOpExpr::Create(ASTContext &C, Expr* SubExpr,
+                            SourceLocation TLoc,
+                            bool HasTrailingLParen) {
+  assert(!SubExpr->containsUnexpandedParameterPack() &&
+    "Unexpanded packs are not allowed in the LHS of a pack op");
+  return new (C) DependentPackOpExpr(SubExpr, TLoc, HasTrailingLParen);
+}
+                                                    

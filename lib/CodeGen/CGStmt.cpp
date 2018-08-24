@@ -146,7 +146,10 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::ForStmtClass:     EmitForStmt(cast<ForStmt>(*S), Attrs);     break;
 
   case Stmt::ReturnStmtClass:  EmitReturnStmt(cast<ReturnStmt>(*S));      break;
-
+  case Stmt::ParametricExpressionReturnStmtClass:
+    EmitReturnStmt(cast<ParametricExpressionReturnStmt>(*S),
+                   /*IsParmExpr=*/true);
+    break;
   case Stmt::SwitchStmtClass:  EmitSwitchStmt(cast<SwitchStmt>(*S));      break;
   case Stmt::GCCAsmStmtClass:  // Intentional fall-through.
   case Stmt::MSAsmStmtClass:   EmitAsmStmt(cast<AsmStmt>(*S));            break;
@@ -1018,8 +1021,8 @@ void CodeGenFunction::EmitReturnOfRValue(RValue RV, QualType Ty) {
 /// EmitReturnStmt - Note that due to GCC extensions, this can have an operand
 /// if the function returns void, or may be missing one if the function returns
 /// non-void.  Fun stuff :).
-void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S) {
-  if (requiresReturnValueCheck()) {
+void CodeGenFunction::EmitReturnStmt(const ReturnStmt &S, bool IsParmExpr) {
+  if (requiresReturnValueCheck() && !IsParmExpr) {
     llvm::Constant *SLoc = EmitCheckSourceLocation(S.getBeginLoc());
     auto *SLocPtr =
         new llvm::GlobalVariable(CGM.getModule(), SLoc->getType(), false,

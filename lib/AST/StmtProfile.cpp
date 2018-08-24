@@ -304,6 +304,11 @@ void StmtProfiler::VisitReturnStmt(const ReturnStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitParametricExpressionReturnStmt(
+                        const ParametricExpressionReturnStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitGCCAsmStmt(const GCCAsmStmt *S) {
   VisitStmt(S);
   ID.AddBoolean(S->isVolatile());
@@ -1277,6 +1282,7 @@ static Stmt::StmtClass DecodeOperatorCall(const CXXOperatorCallExpr *S,
   case OO_Arrow:
   case OO_Call:
   case OO_Conditional:
+  case OO_PostfixTilde:
   case NUM_OVERLOADED_OPERATORS:
     llvm_unreachable("Invalid operator call kind");
 
@@ -1988,6 +1994,31 @@ void StmtProfiler::VisitTemplateArgument(const TemplateArgument &Arg) {
       VisitTemplateArgument(P);
     break;
   }
+}
+
+void StmtProfiler::VisitParametricExpressionIdExpr(
+                                const ParametricExpressionIdExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitDependentParametricExpressionCallExpr(
+                     const DependentParametricExpressionCallExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitParametricExpressionCallExpr(
+                              const ParametricExpressionCallExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitResolvedUnexpandedPackExpr(
+                                const ResolvedUnexpandedPackExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitDependentPackOpExpr(
+                                       const DependentPackOpExpr *S) {
+  VisitExpr(S);
 }
 
 void Stmt::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context,

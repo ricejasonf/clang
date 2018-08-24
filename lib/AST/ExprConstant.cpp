@@ -2527,16 +2527,19 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   // If this is a parameter to an active constexpr function call, perform
   // argument substitution.
   if (const ParmVarDecl *PVD = dyn_cast<ParmVarDecl>(VD)) {
-    // Assume arguments of a potential constant expression are unknown
-    // constant expressions.
-    if (Info.checkingPotentialConstantExpression())
-      return false;
-    if (!Frame || !Frame->Arguments) {
-      Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
-      return false;
+    // constexpr specified parameters in parametric expressions are okay
+    if (!PVD->isConstexpr()) {
+      // Assume arguments of a potential constant expression are unknown
+      // constant expressions.
+      if (Info.checkingPotentialConstantExpression())
+        return false;
+      if (!Frame || !Frame->Arguments) {
+        Info.FFDiag(E, diag::note_invalid_subexpr_in_const_expr);
+        return false;
+      }
+      Result = &Frame->Arguments[PVD->getFunctionScopeIndex()];
+      return true;
     }
-    Result = &Frame->Arguments[PVD->getFunctionScopeIndex()];
-    return true;
   }
 
   // If this is a local variable, dig out its value.
@@ -10994,6 +10997,11 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CoawaitExprClass:
   case Expr::DependentCoawaitExprClass:
   case Expr::CoyieldExprClass:
+  case Expr::ParametricExpressionIdExprClass:
+  case Expr::ParametricExpressionCallExprClass:
+  case Expr::DependentParametricExpressionCallExprClass:
+  case Expr::ResolvedUnexpandedPackExprClass:
+  case Expr::DependentPackOpExprClass:
     return ICEDiag(IK_NotICE, E->getBeginLoc());
 
   case Expr::InitListExprClass: {
@@ -11050,7 +11058,9 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
       // Parameter variables are never constants.  Without this check,
       // getAnyInitializer() can find a default argument, which leads
       // to chaos.
-      if (isa<ParmVarDecl>(D))
+      // Added expception for parametric expression constexpr specified
+      // parameters
+      if (isa<ParmVarDecl>(D) && !cast<ParmVarDecl>(D)->isConstexpr())
         return ICEDiag(IK_NotICE, cast<DeclRefExpr>(E)->getLocation());
 
       // C++ 7.1.5.1p2

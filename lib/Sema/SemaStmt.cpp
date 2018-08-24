@@ -3446,7 +3446,7 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
     return R;
 
   if (VarDecl *VD =
-      const_cast<VarDecl*>(cast<ReturnStmt>(R.get())->getNRVOCandidate())) {
+      const_cast<VarDecl*>(R.getAs<ReturnStmt>()->getNRVOCandidate())) {
     CurScope->addNRVOCandidate(VD);
   } else {
     CurScope->setNoNRVO();
@@ -3458,6 +3458,10 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
 }
 
 StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
+  if (getCurParametricExpressionDecl() && !getCurLambda()) {
+    return BuildParametricExpressionReturnStmt(ReturnLoc, RetValExp);
+  }
+
   // Check for unexpanded parameter packs.
   if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp))
     return StmtError();
@@ -4303,4 +4307,30 @@ StmtResult Sema::ActOnCapturedRegionEnd(Stmt *S) {
   PopFunctionScopeInfo();
 
   return Res;
+}
+
+StmtResult Sema::BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
+                                                     Expr *RetValExp) {
+  // TODO get NRVO candidate information from CurScope 
+  VarDecl *NRVOCandidate = nullptr;
+
+  if (RetValExp && isa<InitListExpr>(RetValExp)) {
+    Diag(ReturnLoc, diag::err_auto_fn_return_init_list);
+    return StmtError();
+  }
+
+  if (CorrectDelayedTyposInExpr(RetValExp).isInvalid()) {
+    return StmtError();
+  }
+
+  ParametricExpressionReturnStmt *New =
+    new (Context) ParametricExpressionReturnStmt(ReturnLoc, RetValExp,
+                                                 NRVOCandidate);
+
+  if (ExprEvalContexts.back().Context ==
+          ExpressionEvaluationContext::DiscardedStatement) {
+    New->setUnreachable();
+  }
+
+  return New;
 }

@@ -3946,6 +3946,87 @@ const DiagnosticBuilder &operator<<(const DiagnosticBuilder &DB,
 const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
                                     AccessSpecifier AS);
 
+// ParametricExpressionDecl
+class ParametricExpressionDecl : public NamedDecl,
+                                 public DeclContext {
+  Stmt *Body = nullptr;
+  ParmVarDecl **ParamInfo = nullptr;
+  unsigned NumParams = 0;
+  unsigned TemplateDepth;
+  bool IsStatic : 1;
+  bool IsPackOp : 1;
+
+  ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
+                           SourceLocation StartL, unsigned TPDepth,
+                           bool IsStatic, bool IsPackOp)
+    : NamedDecl(ParametricExpression, DC, StartL, DN)
+    , DeclContext(ParametricExpression)
+    , TemplateDepth(TPDepth)
+    , IsStatic(IsStatic)
+    , IsPackOp(IsPackOp) {}
+
+public:
+  static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
+                                          DeclarationName DN,
+                                          SourceLocation StartL,
+                                          unsigned TemplateDepth,
+                                          bool IsStatic = false,
+                                          bool IsPackOp = false);
+
+  static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
+                                          ParametricExpressionDecl* Old);
+
+  void setBody(Stmt *S) {
+    Body = S;
+  }
+
+  Stmt* getBody() const {
+    return Body;
+  }
+
+  ParmVarDecl *getSelfParam() {
+    // Forward support for an explicitly declared
+    // `this` annotated parameter.
+    return nullptr;
+  }
+
+  bool isStatic() const {
+    return IsStatic;
+  }
+
+  bool isPackOp() const {
+    return IsPackOp;
+  }
+
+  // Returns parent class decl if this
+  // declaration has an implicit `this`
+  // or nullptr
+  CXXRecordDecl *getThisContext() {
+    if (!IsStatic)
+      return dyn_cast<CXXRecordDecl>(getParent());
+    return nullptr;
+  }
+
+  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
+  unsigned getNumParams() const { return NumParams; }
+
+  unsigned getTemplateDepth() const {
+    return TemplateDepth;
+  }
+
+  // ArrayRef interface to parameters.
+  ArrayRef<ParmVarDecl *> parameters() const {
+    return {ParamInfo, getNumParams()};
+  }
+  MutableArrayRef<ParmVarDecl *> parameters() {
+    return {ParamInfo, getNumParams()};
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return classofKind(D->getKind()); }
+  static bool classofKind(Kind K) { return K == ParametricExpression; }
+};
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_DECLCXX_H

@@ -759,12 +759,19 @@ def ext_alias_declaration : ExtWarn<
 def warn_cxx98_compat_alias_declaration : Warning<
   "alias declarations are incompatible with C++98">,
   InGroup<CXX98Compat>, DefaultIgnore;
+def warn_cxx2a_compat_parametric_expression_declaration : Warning<
+  "parametric expression is a C++2a extension">,
+  InGroup<CXX2a>;
 def err_alias_declaration_not_identifier : Error<
   "name defined in alias declaration must be an identifier">;
 def err_alias_declaration_specialization : Error<
   "%select{partial specialization|explicit specialization|explicit instantiation}0 of alias templates is not permitted">;
 def err_alias_declaration_pack_expansion : Error<
   "alias declaration cannot be a pack expansion">;
+def err_unexpected_using_specifier : Error<
+  "using specifier only allowed for parametric expression parameters">;
+def err_parametric_expression_name_invalid: Error<
+  "name defined in parametric expression declaration must be an identifier">;
 
 // C++17 using-declaration pack expansions
 def ext_multi_using_declaration : ExtWarn<

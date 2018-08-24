@@ -2010,7 +2010,8 @@ def err_auto_not_allowed : Error<
   "|in template argument|in typedef|in type alias|in function return type"
   "|in conversion function type|here|in lambda parameter"
   "|in type allocated by 'new'|in K&R-style function parameter"
-  "|in template parameter|in friend declaration}1">;
+  "|in template parameter|in friend declaration"
+  "|in parametric expression parameter}1">;
 def err_dependent_deduced_tst : Error<
   "typename specifier refers to "
   "%select{class template|function template|variable template|alias template|"
@@ -3798,6 +3799,8 @@ def err_bound_member_function : Error<
   "reference to non-static member function must be called"
   "%select{|; did you mean to call it with no arguments?}0">;
 def note_possible_target_of_call : Note<"possible target for call">;
+def err_parametric_expression_id : Error<
+  "reference to parametric expression must be called">;
 
 def err_ovl_no_viable_object_call : Error<
   "no matching function for call to object of type %0">;
@@ -4242,6 +4245,8 @@ def note_template_nsdmi_here : Note<
   "in instantiation of default member initializer %q0 requested here">;
 def note_template_type_alias_instantiation_here : Note<
   "in instantiation of template type alias %0 requested here">;
+def note_parametric_expression_instantiation_here : Note<
+  "in instantiation of parametric expression %0 requested here">;
 def note_template_exception_spec_instantiation_here : Note<
   "in instantiation of exception specification for %0 requested here">;
 def warn_var_template_missing : Warning<"instantiation of variable %q0 "
@@ -4464,7 +4469,7 @@ def err_unexpanded_parameter_pack : Error<
   "size|static assertion|fixed underlying type|enumerator value|"
   "using declaration|friend declaration|qualifier|initializer|default argument|"
   "non-type template parameter type|exception type|partial specialization|"
-  "__if_exists name|__if_not_exists name|lambda|block}0 contains"
+  "__if_exists name|__if_not_exists name|lambda|block|unary pack expression}0 contains"
   "%plural{0: an|:}1 unexpanded parameter pack"
   "%plural{0:|1: %2|2:s %2 and %3|:s %2, %3, ...}1">;
 
@@ -4671,6 +4676,23 @@ def ext_redefinition_of_typedef : ExtWarn<
   InGroup<DiagGroup<"typedef-redefinition"> >;
 def err_redefinition_variably_modified_typedef : Error<
   "redefinition of %select{typedef|type alias}0 for variably-modified type %1">;
+
+def err_redefinition_of_parametric_expression : Error<
+  "redefinition of parametric expression %0">;
+def err_parametric_expression_vararg : Error<
+  "C style variadic function ellipsis not allowed in parametric expression declarator">;
+def err_parametric_expression_multiple_parameter_packs : Error<
+  "Parametric expression parameter list may contain only one parameter pack">;
+def err_parametric_expression_requires_constraint : Error<
+  "Parametric expression parameter specifier must be constraint that is auto">;
+def err_parametric_expression_constraint_has_qualifiers : Error<
+  "Parametric expression parameter constraint must not have qualifiers">;
+def err_parametric_expression_arg_list_different_arity : Error<
+  "%select{too few|too many}0 arguments for parametric expression">;
+def err_member_parametric_expression_must_have_self_param : Error<
+  "Non-static member parametric expression must have parameter for object instance">;
+def note_ovl_parametric_expression_candidate : Note<
+    "parametric expression candidate">;
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;
@@ -9440,4 +9462,19 @@ def err_std_compare_type_not_supported : Error<
    "member '%2' is missing|"
    "the type is not trivially copyable|"
    "the type does not have the expected form}1">;
+
+// unary pack operation via postfix tilde
+def err_parametric_expression_postfix_tilde_not_call: Error<
+  "postfix tilde on a parametric expression name must be "
+  "part of a call">;
+def err_parametric_expression_not_pack_op: Error<
+  "parametric expression called with postfix tilde does not return a pack">;
+def err_parametric_expression_is_pack_op: Error<
+  "parametric expression returning pack called without postfix tilde">;
+def err_parametric_expression_pack_op_transparent: Error<
+  "parametric expression returning pack must not require scope">;
+def err_no_member_pack_operator: Error<
+  "type %0 does not implement pack operator">;
+def err_parametric_expression_must_return_pack: Error<
+  "parametric expression pack operation must return unexpanded pack">;
 } // end of sema component.

@@ -391,6 +391,7 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::OCLReserveID:
   case BuiltinType::BuiltinFn:
   case BuiltinType::OMPArraySection:
+  case BuiltinType::ParametricExpressionId:
     return TST_unspecified;
   }
 

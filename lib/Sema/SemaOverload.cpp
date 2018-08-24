@@ -6392,6 +6392,12 @@ void Sema::AddFunctionCandidates(const UnresolvedSetImpl &Fns,
     NamedDecl *D = F.getDecl()->getUnderlyingDecl();
     ArrayRef<Expr *> FunctionArgs = Args;
 
+    if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(F.getDecl())) {
+      AddParametricExpressionCandidate(PD, F.getPair(), CandidateSet);
+      return;
+    }
+
     FunctionTemplateDecl *FunTmpl = dyn_cast<FunctionTemplateDecl>(D);
     FunctionDecl *FD =
         FunTmpl ? FunTmpl->getTemplatedDecl() : cast<FunctionDecl>(D);
@@ -6464,6 +6470,10 @@ void Sema::AddMethodCandidate(DeclAccessPair FoundDecl,
                                /*ExplicitArgs*/ nullptr, ObjectType,
                                ObjectClassification, Args, CandidateSet,
                                SuppressUserConversions);
+  } else if (ParametricExpressionDecl *PD =
+      dyn_cast_or_null<ParametricExpressionDecl>(Decl)) {
+    AddParametricExpressionCandidate(PD, FoundDecl, CandidateSet);
+
   } else {
     AddMethodCandidate(cast<CXXMethodDecl>(Decl), FoundDecl, ActingContext,
                        ObjectType, ObjectClassification, Args, CandidateSet,
@@ -6742,6 +6752,24 @@ Sema::AddTemplateOverloadCandidate(FunctionTemplateDecl *FunctionTemplate,
   AddOverloadCandidate(Specialization, FoundDecl, Args, CandidateSet,
                        SuppressUserConversions, PartialOverloading,
                        /*AllowExplicit*/false, Conversions);
+}
+
+/// Parametric Expression candidates are always operators
+/// and are always considered viable.
+void
+Sema::AddParametricExpressionCandidate(ParametricExpressionDecl *PD,
+                                       DeclAccessPair FoundDecl,
+                                       OverloadCandidateSet& CandidateSet) {
+  if (PD->getDeclName().getNameKind() != DeclarationName::CXXOperatorName)
+    return;
+  OverloadCandidate &Candidate = CandidateSet.addCandidate();
+  Candidate.FoundDecl = FoundDecl;
+  Candidate.Function = nullptr;
+  Candidate.Viable = true;
+  // We don't care about conversions here
+  Candidate.IsSurrogate = false;
+  Candidate.IgnoreObjectArgument = true;
+  Candidate.ExplicitCallArguments = 0;
 }
 
 /// Check that implicit conversion sequences can be formed for each argument
@@ -8734,6 +8762,7 @@ void Sema::AddBuiltinOperatorCandidates(OverloadedOperatorKind Op,
   case OO_Array_New:
   case OO_Array_Delete:
   case OO_Call:
+  case OO_PostfixTilde:
     llvm_unreachable(
                     "Special operators don't use AddBuiltinOperatorCandidates");
 
@@ -8898,13 +8927,20 @@ Sema::AddArgumentDependentLookupCandidates(DeclarationName Name,
       Fns.erase(Cand->Function);
       if (FunctionTemplateDecl *FunTmpl = Cand->Function->getPrimaryTemplate())
         Fns.erase(FunTmpl);
+    } else if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Cand->FoundDecl.getDecl())) {
+      Fns.erase(PD);
     }
 
   // For each of the ADL candidates we found, add it to the overload
   // set.
   for (ADLResult::iterator I = Fns.begin(), E = Fns.end(); I != E; ++I) {
     DeclAccessPair FoundDecl = DeclAccessPair::make(*I, AS_none);
-    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(*I)) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(*I)) {
+      AddParametricExpressionCandidate(PD, FoundDecl, CandidateSet);
+    }
+    else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(*I)) {
       if (ExplicitTemplateArgs)
         continue;
 
@@ -9019,6 +9055,11 @@ bool clang::isBetterOverloadCandidate(
     return Cand1.Viable;
   else if (!Cand1.Viable)
     return false;
+
+  // parametric expressions are ambiguous with other viable candidates
+  if (dyn_cast_or_null<ParametricExpressionDecl>(Cand1.FoundDecl.getDecl()) ||
+      dyn_cast_or_null<ParametricExpressionDecl>(Cand2.FoundDecl.getDecl()))
+     return false;
 
   // C++ [over.match.best]p1:
   //
@@ -10709,6 +10750,10 @@ void OverloadCandidateSet::NoteCandidates(
                             /*TakingCandidateAddress=*/false);
     else if (Cand->IsSurrogate)
       NoteSurrogateCandidate(S, Cand);
+    else if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Cand->FoundDecl.getDecl()))
+      S.Diag(PD->getBeginLoc(),
+             diag::note_ovl_parametric_expression_candidate);
     else {
       assert(Cand->Viable &&
              "Non-viable built-in candidates are not added to Cands.");
@@ -12240,6 +12285,9 @@ Sema::CreateOverloadedUnaryOp(SourceLocation OpLoc, UnaryOperatorKind Opc,
         return ExprError();
 
       return MaybeBindToTemporary(TheCall);
+    } else if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+      return ActOnParametricExpressionCallExpr(PD, nullptr, ArgsArray, OpLoc);
     } else {
       // We matched a built-in operator. Convert the arguments, then
       // break out so that we will build the appropriate built-in
@@ -12486,6 +12534,9 @@ Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
                   VariadicDoesNotApply);
 
         return MaybeBindToTemporary(TheCall);
+      } else if (ParametricExpressionDecl *PD =
+          dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+        return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
       } else {
         // We matched a built-in operator. Convert the arguments, then
         // break out so that we will build the appropriate built-in
@@ -12698,6 +12749,10 @@ Sema::CreateOverloadedArraySubscriptExpr(SourceLocation LLoc,
           return ExprError();
 
         return MaybeBindToTemporary(TheCall);
+      } else if (ParametricExpressionDecl *PD =
+          dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+        ArrayRef<Expr *> ArgsArray(Args, 2);
+        return ActOnParametricExpressionCallExpr(PD, nullptr, ArgsArray, LLoc);
       } else {
         // We matched a built-in operator. Convert the arguments, then
         // break out so that we will build the appropriate built-in
@@ -13175,6 +13230,10 @@ Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
   UnbridgedCasts.restore();
 
   if (Best->Function == nullptr) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl()))
+      return ActOnParametricExpressionCallExpr(PD, Obj, Args, LParenLoc);
+
     // Since there is no function declaration, this is one of the
     // surrogate candidates. Dig out the conversion function.
     CXXConversionDecl *Conv
@@ -13404,6 +13463,14 @@ Sema::BuildOverloadedArrowExpr(Scope *S, Expr *Base, SourceLocation OpLoc,
   }
 
   CheckMemberOperatorAccess(OpLoc, Base, nullptr, Best->FoundDecl);
+
+  if (Best->Function == nullptr) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+      ArrayRef<Expr*> Args = {&Base, &Base + 1};
+      return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
+    }
+  }
 
   // Convert the object parameter.
   CXXMethodDecl *Method = cast<CXXMethodDecl>(Best->Function);

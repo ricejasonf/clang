@@ -1164,6 +1164,7 @@ RValue CodeGenFunction::EmitUnsupportedRValue(const Expr *E,
 
 LValue CodeGenFunction::EmitUnsupportedLValue(const Expr *E,
                                               const char *Name) {
+  assert(false);
   ErrorUnsupported(E, Name);
   llvm::Type *Ty = llvm::PointerType::getUnqual(ConvertType(E->getType()));
   return MakeAddrLValue(Address(llvm::UndefValue::get(Ty), CharUnits::One()),
@@ -1356,6 +1357,9 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitCoawaitLValue(cast<CoawaitExpr>(E));
   case Expr::CoyieldExprClass:
     return EmitCoyieldLValue(cast<CoyieldExpr>(E));
+  case Expr::ParametricExpressionCallExprClass:
+    return EmitParametricExpressionCallExprLValue(
+                cast<ParametricExpressionCallExpr>(E));
   }
 }
 

@@ -776,6 +776,8 @@ Parser::TPResult Parser::TryParseOperatorId() {
     if (NextToken().is(tok::r_paren)) {
       ConsumeParen();
       ConsumeParen();
+      // check for postfix tilde ()~
+      TryConsumeToken(tok::tilde);
       return TPResult::True;
     }
     break;

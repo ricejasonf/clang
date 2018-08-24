@@ -688,6 +688,21 @@ Parser::ParseUsingDeclaration(DeclaratorContext Context,
     return nullptr;
   }
 
+#if 0 // TODO Remove
+  // parametric-expression
+  if (Tok.is(tok::l_paren)) {
+    if (InvalidDeclarator) {
+      SkipUntil(tok::semi);
+      return nullptr;
+    }
+
+    Decl *DeclFromDeclSpec = nullptr;
+    Decl *AD = ParseParametricExpressionDeclarationAfterUsingDeclarator(
+        UsingLoc, D, DeclEnd, AS, &DeclFromDeclSpec);
+    return Actions.ConvertDeclToDeclGroup(AD, DeclFromDeclSpec);
+  }
+#endif
+
   SmallVector<Decl *, 8> DeclsInGroup;
   while (true) {
     // Parse (optional) attributes (most likely GNU strong-using extension).
@@ -813,6 +828,160 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
   return Actions.ActOnAliasDeclaration(getCurScope(), AS, TemplateParamsArg,
                                        UsingLoc, D.Name, Attrs, TypeAlias,
                                        DeclFromDeclSpec);
+}
+
+Parser::DeclGroupPtrTy
+Parser::ParseParametricExpressionDeclaration(
+                              DeclaratorContext Context,
+                              AccessSpecifier AS) {
+  if (!getLangOpts().CPlusPlus2a) {
+    Diag(Tok.getLocation(),
+         diag::warn_cxx2a_compat_parametric_expression_declaration);
+  }
+
+  // Declaration Specifiers
+  //
+  // must be `using` or `static using` for static members
+  // Consider adding this to ParseDeclarationSpecifiers.
+
+  SourceLocation BeginLoc;
+
+  // consume optional kw_static specifier for class members
+  bool IsStatic = TryConsumeToken(tok::kw_static, BeginLoc);
+  assert((!IsStatic || Context == DeclaratorContext::MemberContext) &&
+      "Expecting static specifier for member only");
+
+  // consume kw_using
+  SourceLocation UsingLoc;
+  if (!TryConsumeToken(tok::kw_using, UsingLoc)) {
+    llvm_unreachable("Token was expected to be kw_using");
+  }
+
+  if (!IsStatic)
+    BeginLoc = UsingLoc;
+
+  DeclSpec DS(AttrFactory);
+  if (IsStatic) {
+    unsigned DiagID;
+    const char *PrevSpec = nullptr;
+    DS.SetStorageClassSpec(Actions, DeclSpec::SCS_static,
+                           BeginLoc, PrevSpec, DiagID,
+                           Actions.getPrintingPolicy());
+  }
+
+  Declarator D(DS, DeclaratorContext::ParametricExpressionContext);
+
+  // Name
+  //
+  // Either an identifier or an operator function id
+
+  CXXScopeSpec Spec;
+  UnqualifiedId &Name = D.getName();
+  if (ParseUnqualifiedId(
+          Spec,
+          /*EnteringContext=*/false,
+          /*AllowDestructorName=*/false,
+          /*AllowConstructorName=*/false,
+          /*AllowDeductionGuide=*/false,
+          nullptr, nullptr, Name)) {
+    return nullptr;
+  }
+
+  bool IsPackOp = false;
+
+  if (Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
+    // check for `operator()~` to see if this is a postfix
+    // tilde which is a pack op
+    if (Name.OperatorFunctionId.Operator == OO_PostfixTilde)
+      IsPackOp = true;
+  } else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
+    Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
+      << FixItHint::CreateRemoval(Name.getSourceRange());
+    SkipMalformedDecl();
+    return nullptr;
+  } else {
+    // The identifier may be followed optionally by a
+    // tilde to denote it must return a pack
+    IsPackOp = TryConsumeToken(tok::tilde);
+  }
+
+  Scope* S = getCurScope();
+  if (ExpectAndConsume(tok::l_paren)) {
+    return nullptr;
+  }
+
+
+  // Params
+
+  TemplateParameterDepthRAII CurTemplateDepthTracker(TemplateParameterDepth);
+  ParseScope PrototypeScope(this,
+                            Scope::FunctionPrototypeScope |
+                            Scope::FunctionDeclarationScope |
+                            Scope::DeclScope);
+
+  BalancedDelimiterTracker T(*this, tok::l_paren);
+  T.consumeOpen();
+
+  // Parse parameter-declaration-clause.
+  SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;
+  ParsedAttributes attrs(AttrFactory);
+  SourceLocation EllipsisLoc;
+
+  ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
+                                               S, getCurScope(), AS,
+                                               BeginLoc,
+                                               TemplateParameterDepth, D,
+                                               IsPackOp);
+  if (!New)
+    return nullptr;
+
+  Actions.PushDeclContext(Actions.getCurScope(), New);
+
+  if (Tok.isNot(tok::r_paren)) {
+    ParseParameterDeclarationClause(D, attrs, ParamInfo, EllipsisLoc);
+  }
+  T.consumeClose();
+  PrototypeScope.Exit();
+
+#if 0 // I don't think this is right
+  // C style variadic function syntax is not allowed in parametric expression
+  // parameter list
+  if (D.hasEllipsis()) {
+    Diag(D.getBeginLoc(), diag::err_parametric_expression_vararg)
+      << Name.getName();
+    return nullptr;
+  }
+#endif
+
+  bool NeedsRAII = false;
+  Actions.PushFunctionScope();
+  ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
+                             Scope::CompoundStmtScope);
+  if (Actions.CheckParametricExpressionParams(
+        getCurScope(), NeedsRAII, New, ParamInfo)) {
+    Actions.PopDeclContext(); // DeclContextRAII would be nice
+    SkipMalformedDecl();
+    return nullptr;
+  }
+
+  if (Tok.isNot(tok::l_brace)) {
+    Diag(Tok, diag::err_expected) << tok::l_brace;
+    SkipMalformedDecl();
+    return nullptr;
+  }
+
+  // Body
+
+  ++CurTemplateDepthTracker;
+  StmtResult CSResult = ParseCompoundStatement();
+  Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New,
+                                                              NeedsRAII,
+                                                              CSResult);
+  Actions.PopDeclContext();
+  BodyScope.Exit();
+  Actions.PopFunctionScopeInfo();
+
+  return Actions.ConvertDeclToDeclGroup(TheDecl);
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.
@@ -2518,8 +2687,18 @@ Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
 
   MaybeParseMicrosoftAttributes(attrs);
 
+  if (Tok.is(tok::kw_static) && NextToken().is(tok::kw_using))
+    return ParseParametricExpressionDeclaration(
+        DeclaratorContext::MemberContext, AS);
+
   if (Tok.is(tok::kw_using)) {
     ProhibitAttributes(attrs);
+
+    if (GetLookAheadToken(1).is(tok::kw_operator) ||
+        GetLookAheadToken(2).is(tok::tilde) ||
+        GetLookAheadToken(2).is(tok::l_paren))
+      return ParseParametricExpressionDeclaration(
+          DeclaratorContext::MemberContext, AS);
 
     // Eat 'using'.
     SourceLocation UsingLoc = ConsumeToken();

@@ -280,6 +280,11 @@ PLACEHOLDER_TYPE(Overload, OverloadTy)
 //   x->foo       # if only contains non-static members
 PLACEHOLDER_TYPE(BoundMember, BoundMemberTy)
 
+// A placeholder type for the name of a parametric expression
+// which does not refer to a value but may appear as an argument
+// to a parametric expression call.
+PLACEHOLDER_TYPE(ParametricExpressionId, ParametricExpressionIdTy)
+
 // The type of an expression which refers to a pseudo-object,
 // such as those introduced by Objective C's @property or
 // VS.NET's __property declarations.  A placeholder type.  The

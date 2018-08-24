@@ -1011,6 +1011,9 @@ namespace serialization {
       /// \brief The '_Sat unsigned long _Fract' type
       PREDEF_TYPE_SAT_ULONG_FRACT_ID = 69,
 
+      /// \brief The placeholder type of a parametric expression name
+      PREDEF_TYPE_PARAMETRIC_EXPRESSION_ID = 70,
+
       /// OpenCL image types with auto numeration
 #define IMAGE_TYPE(ImgType, Id, SingletonId, Access, Suffix) \
       PREDEF_TYPE_##Id##_ID,
@@ -1533,6 +1536,9 @@ namespace serialization {
 
       /// An OMPDeclareReductionDecl record.
       DECL_OMP_DECLARE_REDUCTION,
+
+      // A parametric expression
+      DECL_PARAMETRIC_EXPRESSION,
     };
 
     /// Record codes for each kind of statement or expression.
@@ -1600,6 +1606,9 @@ namespace serialization {
 
       /// A ReturnStmt record.
       STMT_RETURN,
+
+      /// A ReturnStmt record.
+      STMT_PARAMETRIC_EXPRESSION_RETURN,
 
       /// A DeclStmt record.
       STMT_DECL,

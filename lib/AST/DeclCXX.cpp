@@ -2912,3 +2912,49 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
                                            AccessSpecifier AS) {
   return DB << getAccessName(AS);
 }
+
+ParametricExpressionDecl *ParametricExpressionDecl::Create(
+                            ASTContext &C, DeclContext *DC,
+                            DeclarationName DN,
+                            SourceLocation StartL,
+                            unsigned TemplateDepth,
+                            bool IsStatic,
+                            bool IsPackOp) {
+  ParametricExpressionDecl *New =
+      new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth,
+                                           IsStatic, IsPackOp);
+  if (DN.getNameKind() == DeclarationName::CXXOperatorName &&
+        !DC->isRecord())
+    New->setNonMemberOperator();
+  return New;
+}
+
+// This is for cloning  for use in template instantiations.
+ParametricExpressionDecl *ParametricExpressionDecl::Create(
+                            ASTContext &C, DeclContext *DC,
+                            ParametricExpressionDecl *Old) {
+  ParametricExpressionDecl *New =
+      new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
+                                           Old->getBeginLoc(),
+                                           Old->getTemplateDepth(),
+                                           Old->isStatic(),
+                                           Old->isPackOp());
+  New->setAccess(Old->getAccess());
+  if (Old->getDeclName().getNameKind() == DeclarationName::CXXOperatorName &&
+        !DC->isRecord())
+    New->setNonMemberOperator();
+  return New;
+}
+
+void ParametricExpressionDecl::setParams(ASTContext &C,
+                                         ArrayRef<ParmVarDecl *> NewParamInfo) {
+  assert(!ParamInfo && "Already has param info!");
+  NumParams = NewParamInfo.size();
+
+  // Zero params -> null pointer.
+  if (!NewParamInfo.empty()) {
+    ParamInfo = new (C) ParmVarDecl*[NewParamInfo.size()];
+    std::copy(NewParamInfo.begin(), NewParamInfo.end(), ParamInfo);
+  }
+}
+

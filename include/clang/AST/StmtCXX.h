@@ -530,6 +530,37 @@ public:
   }
 };
 
+// ParametricExpressionReturnStmt avoids confusion with a
+// normal ReturnStmt as FunctionDecl relies on them heavily.
+class ParametricExpressionReturnStmt : public ReturnStmt {
+  // we lose context during deduction
+  bool Unreachable = false;
+
+public:
+  explicit ParametricExpressionReturnStmt(SourceLocation RL)
+    : ParametricExpressionReturnStmt(RL, nullptr, nullptr) {}
+
+  ParametricExpressionReturnStmt(SourceLocation RL, Expr *E,
+                                 const VarDecl *NRVOCandidate)
+    : ReturnStmt(ParametricExpressionReturnStmtClass,
+                 RL, E, NRVOCandidate) {}
+
+  explicit ParametricExpressionReturnStmt(EmptyShell Empty)
+    : ReturnStmt(ParametricExpressionReturnStmtClass, Empty) {}
+
+  void setUnreachable() {
+    Unreachable = true;
+  }
+
+  bool isUnreachable() {
+    return Unreachable;
+  }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ParametricExpressionReturnStmtClass;
+  }
+};
+
 }  // end namespace clang
 
 #endif

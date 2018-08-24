@@ -222,7 +222,9 @@ namespace threadSafety {
 
 // FIXME: No way to easily map from TemplateTypeParmTypes to
 // TemplateTypeParmDecls, so we have this horrible PointerUnion.
-typedef std::pair<llvm::PointerUnion<const TemplateTypeParmType*, NamedDecl*>,
+typedef std::pair<llvm::PointerUnion4<const TemplateTypeParmType*, NamedDecl*,
+                                      ResolvedUnexpandedPackExpr*,
+                                      DependentPackOpExpr*>,
                   SourceLocation> UnexpandedParameterPack;
 
 /// Describes whether we've seen any nullability information for the given
@@ -2368,6 +2370,10 @@ public:
   /// in a 'block', this returns the containing context.
   NamedDecl *getCurFunctionOrMethodDecl();
 
+  /// getCurParametricExpressionDecl - If inside of a parametric expression body,
+  /// this returns a pointer to the decl being parsed.
+  ParametricExpressionDecl *getCurParametricExpressionDecl();
+
   /// Add this decl to the scope shadowed decl chains.
   void PushOnScopeChains(NamedDecl *D, Scope *S, bool AddToContext = true);
 
@@ -2761,6 +2767,9 @@ public:
                                     OverloadCandidateSet& CandidateSet,
                                     bool SuppressUserConversions = false,
                                     bool PartialOverloading = false);
+  void AddParametricExpressionCandidate(ParametricExpressionDecl *PD,
+                                        DeclAccessPair FoundDecl,
+                                        OverloadCandidateSet& CandidateSet);
   bool CheckNonDependentConversions(FunctionTemplateDecl *FunctionTemplate,
                                     ArrayRef<QualType> ParamTypes,
                                     ArrayRef<Expr *> Args,
@@ -3845,6 +3854,12 @@ public:
                              Scope *CurScope);
   StmtResult BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp);
   StmtResult ActOnCapScopeReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp);
+  StmtResult BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
+                                                 Expr *RetValExp);
+  ExprResult BuildResolvedUnexpandedPackExpr(
+                                SourceLocation BeginLoc, Expr* Pattern,
+                                MultiLevelTemplateArgumentList TemplateArgs);
+
 
   StmtResult ActOnGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
                              bool IsVolatile, unsigned NumOutputs,
@@ -4668,6 +4683,38 @@ public:
                               SourceLocation UsingLoc, UnqualifiedId &Name,
                               const ParsedAttributesView &AttrList,
                               TypeResult Type, Decl *DeclFromDeclSpec);
+
+  ParametricExpressionDecl *ActOnParametricExpressionDecl(
+                        Scope *S, Scope *BodyScope, AccessSpecifier AS,
+                        SourceLocation UsingLoc,
+                        unsigned TemplateDepth,
+                        Declarator &ParametricExpressionDeclarator,
+                        bool IsPackOp = false);
+  bool CheckParametricExpressionParams(
+                        Scope *BodyScope, bool &NeedsRAII,
+                        ParametricExpressionDecl *New,
+                        MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo);
+  Decl *ActOnFinishParametricExpressionDecl(
+                        ParametricExpressionDecl* D,
+                        bool NeedsRAII,
+                        StmtResult CompoundStmtResult);
+
+  ExprResult ActOnParametricExpressionCallExpr(
+                        ParametricExpressionIdExpr *Fn,
+                        ArrayRef<Expr*> ArgExprs, SourceLocation LParenLoc);
+  ExprResult ActOnParametricExpressionCallExpr(
+                        ParametricExpressionDecl *D,
+                        Expr *BaseExpr, ArrayRef<Expr*> ArgExprs,
+                        SourceLocation Loc,
+                        bool ReturnsPack = false);
+  ExprResult BuildParametricExpressionCallExpr(
+                        SourceLocation BeginLoc, CompoundStmt *Body,
+                        ArrayRef<ParmVarDecl*> Params);
+  ParmVarDecl *BuildParametricExpressionParam(
+                        ParmVarDecl *OldParam, Expr *ArgExpr);
+
+  ExprResult ActOnPackOpExpr(SourceLocation TildeLoc, Expr* LHS,
+                             bool HasTrailingLParen);
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,
   /// including handling of its default argument expressions.
@@ -6611,7 +6658,10 @@ public:
     UPPC_Lambda,
 
     /// Block expression,
-    UPPC_Block
+    UPPC_Block,
+
+    /// Unary pack expression
+    UPPC_PackOp
   };
 
   /// Diagnose unexpanded parameter packs.
@@ -6881,6 +6931,20 @@ public:
   /// This is intended for use when transforming 'sizeof...(Arg)' in order to
   /// avoid actually expanding the pack where possible.
   Optional<unsigned> getFullyPackExpandedSize(TemplateArgument Arg);
+
+  // Returns true if Pattern contains unexpanded packs
+  // that are all ResolvedUnexpandedPackExpr
+  bool containsAllResolvedPacks(Expr* Pattern);
+  bool containsAllResolvedPacks(QualType Pattern);
+
+  bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                        SmallVectorImpl<SourceLocation> &CommaLocs,
+                                 SmallVectorImpl<Expr *> &Outputs);
+  bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                                 SmallVectorImpl<Expr *> &Outputs);
+  bool TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
+                           SmallVectorImpl<ParsedTemplateArgument> &ArgList);
+
 
   //===--------------------------------------------------------------------===//
   // C++ Template Argument Deduction (C++ [temp.deduct])
@@ -7328,6 +7392,28 @@ public:
   };
 
   friend class ArgumentPackSubstitutionRAII;
+
+  // Always require rebuilding in AST transformations
+  // when substituting a declref with an expression
+  // via `using` specified variables. This affects
+  // the context of contained variable declarations
+  // which must also be rebuilt.
+  bool ExpandingExprAlias;
+
+  class ExpandingExprAliasRAII {
+    Sema &Self;
+    bool OldValue;
+
+  public:
+    ExpandingExprAliasRAII(Sema &Self, int NewValue = true)
+      : Self(Self), OldValue(Self.ExpandingExprAlias) {
+      Self.ExpandingExprAlias = NewValue;
+    }
+
+    ~ExpandingExprAliasRAII() {
+      Self.ExpandingExprAlias = OldValue;
+    }
+  };
 
   /// For each declaration that involved template argument deduction, the
   /// set of diagnostics that were suppressed during that template argument

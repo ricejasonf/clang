@@ -1987,7 +1987,8 @@ private:
     DSC_template_param, // template parameter context
     DSC_template_type_arg, // template type argument context
     DSC_objc_method_result, // ObjC method result context, enables 'instancetype'
-    DSC_condition // condition declaration context
+    DSC_condition, // condition declaration context
+    DSC_param_var // parameter variable declaration
   };
 
   /// Is this a context in which we are parsing just a type-specifier (or
@@ -2000,6 +2001,7 @@ private:
     case DeclSpecContext::DSC_top_level:
     case DeclSpecContext::DSC_objc_method_result:
     case DeclSpecContext::DSC_condition:
+    case DeclSpecContext::DSC_param_var:
       return false;
 
     case DeclSpecContext::DSC_template_type_arg:
@@ -2021,6 +2023,7 @@ private:
     case DeclSpecContext::DSC_top_level:
     case DeclSpecContext::DSC_condition:
     case DeclSpecContext::DSC_type_specifier:
+    case DeclSpecContext::DSC_param_var:
       return true;
 
     case DeclSpecContext::DSC_objc_method_result:
@@ -2684,6 +2687,10 @@ private:
       const ParsedTemplateInfo &TemplateInfo, SourceLocation UsingLoc,
       UsingDeclarator &D, SourceLocation &DeclEnd, AccessSpecifier AS,
       ParsedAttributes &Attrs, Decl **OwnedType = nullptr);
+
+  DeclGroupPtrTy ParseParametricExpressionDeclaration(
+      DeclaratorContext Context,
+      AccessSpecifier AS = AS_none);
 
   Decl *ParseStaticAssertDeclaration(SourceLocation &DeclEnd);
   Decl *ParseNamespaceAlias(SourceLocation NamespaceLoc,

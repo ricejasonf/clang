@@ -408,6 +408,11 @@ void StmtPrinter::VisitReturnStmt(ReturnStmt *Node) {
   if (Policy.IncludeNewlines) OS << "\n";
 }
 
+void StmtPrinter::VisitParametricExpressionReturnStmt(
+                        ParametricExpressionReturnStmt *Node) {
+  VisitReturnStmt(Node);
+}
+
 void StmtPrinter::VisitGCCAsmStmt(GCCAsmStmt *Node) {
   Indent() << "asm ";
 
@@ -2796,6 +2801,32 @@ void StmtPrinter::VisitAsTypeExpr(AsTypeExpr *Node) {
   OS << ", ";
   Node->getType().print(OS, Policy);
   OS << ")";
+}
+
+void StmtPrinter::VisitParametricExpressionIdExpr(
+                                 ParametricExpressionIdExpr *Node) {
+  // TODO JASON uhhh do we need to worry about name qualifiers here
+  OS << Node->getDefinitionDecl()->getName();
+}
+
+void StmtPrinter::VisitDependentParametricExpressionCallExpr(
+                      DependentParametricExpressionCallExpr *Node) {
+  // TODO
+}
+
+void StmtPrinter::VisitParametricExpressionCallExpr(
+                               ParametricExpressionCallExpr *Node) {
+  // TODO might have to store the original CallExpr and print that idk
+}
+
+void StmtPrinter::VisitResolvedUnexpandedPackExpr(
+                                 ResolvedUnexpandedPackExpr *Node) {
+  // TODO
+}
+
+void StmtPrinter::VisitDependentPackOpExpr(
+                                        DependentPackOpExpr *Node) {
+  // TODO
 }
 
 //===----------------------------------------------------------------------===//

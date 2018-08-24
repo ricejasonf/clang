@@ -1727,6 +1727,8 @@ bool NamedDecl::isCXXInstanceMember() const {
     return true;
   if (const auto *MD = dyn_cast_or_null<CXXMethodDecl>(D->getAsFunction()))
     return MD->isInstance();
+  if (const auto *PD = dyn_cast_or_null<ParametricExpressionDecl>(D))
+    return !PD->isStatic();
   return false;
 }
 

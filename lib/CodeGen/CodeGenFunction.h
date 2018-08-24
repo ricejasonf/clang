@@ -1503,6 +1503,35 @@ public:
     CallArgList OldCXXInheritedCtorInitExprArgs;
   };
 
+  class ParametricExpressionCallExprScope {
+    CodeGenFunction &CGF;
+    const Decl *OldCurCodeDecl;
+    Address OldReturnValue;
+    unsigned OldNumReturnExprs;
+    unsigned OldNumSimpleReturnExprs;
+    JumpDest OldReturnBlock;
+
+  public:
+    ParametricExpressionCallExprScope(CodeGenFunction &CGF)
+      : CGF(CGF)
+      , OldCurCodeDecl(CGF.CurCodeDecl)
+      , OldReturnValue(CGF.ReturnValue)
+      , OldNumReturnExprs(CGF.NumReturnExprs)
+      , OldNumSimpleReturnExprs(CGF.NumSimpleReturnExprs)
+      , OldReturnBlock(CGF.ReturnBlock) {
+      CGF.NumReturnExprs = 0;
+      CGF.NumSimpleReturnExprs = 0;
+    }
+
+    ~ParametricExpressionCallExprScope() {
+      CGF.CurCodeDecl = OldCurCodeDecl;
+      CGF.ReturnValue = OldReturnValue;
+      CGF.NumReturnExprs = OldNumReturnExprs;
+      CGF.NumSimpleReturnExprs = OldNumSimpleReturnExprs;
+      CGF.ReturnBlock = OldReturnBlock;
+    }
+  };
+
 private:
   /// CXXThisDecl - When generating code for a C++ member function,
   /// this will hold the implicit 'this' declaration.
@@ -2850,7 +2879,7 @@ public:
   void EmitDoStmt(const DoStmt &S, ArrayRef<const Attr *> Attrs = None);
   void EmitForStmt(const ForStmt &S,
                    ArrayRef<const Attr *> Attrs = None);
-  void EmitReturnStmt(const ReturnStmt &S);
+  void EmitReturnStmt(const ReturnStmt &S, bool IsParmExpr = false);
   void EmitDeclStmt(const DeclStmt &S);
   void EmitBreakStmt(const BreakStmt &S);
   void EmitContinueStmt(const ContinueStmt &S);
@@ -3955,6 +3984,16 @@ public:
   void EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Dest);
 
   RValue EmitAtomicExpr(AtomicExpr *E);
+
+  Address EmitParametricExpressionCallExprInternal(
+                                      const ParametricExpressionCallExpr* E,
+                                      AggValueSlot AggSlot);
+  RValue EmitParametricExpressionCallExpr(
+                                        const ParametricExpressionCallExpr* E,
+                                        AggValueSlot AggSlot = 
+                                              AggValueSlot::ignored());
+  LValue EmitParametricExpressionCallExprLValue(
+                                        const ParametricExpressionCallExpr* E);
 
   //===--------------------------------------------------------------------===//
   //                         Annotations Emission

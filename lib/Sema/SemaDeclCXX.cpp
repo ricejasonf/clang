@@ -10533,6 +10533,152 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
+ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
+                          Scope *S, Scope *BodyScope, AccessSpecifier AS,
+                          SourceLocation BeginLoc, unsigned TemplateDepth,
+                          Declarator &D, bool IsPackOp) {
+  DeclarationNameInfo NameInfo = GetNameForDeclarator(D);
+  LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
+                        NotForRedeclaration);
+  LookupName(Previous, S);
+  FilterLookupForScope(Previous, CurContext, S, /*ConsiderLinkage*/false,
+                       /*AllowInlineNamespace*/false);
+
+  if (!Previous.empty()) {
+    NamedDecl *PreviousDecl = Previous.getRepresentativeDecl();
+    if (PreviousDecl->getKind() == Decl::ParametricExpression) {
+      Diag(BeginLoc, diag::err_redefinition_of_parametric_expression)
+        << NameInfo.getName();
+      notePreviousDefinition(PreviousDecl,
+                             D.getBeginLoc());
+    } else {
+      Diag(BeginLoc, diag::err_redefinition_different_kind)
+        << NameInfo.getName();
+      notePreviousDefinition(PreviousDecl,
+                             D.getBeginLoc());
+    }
+    return nullptr;
+  }
+
+  bool IsStatic = D.getDeclSpec().getStorageClassSpec() ==
+    DeclSpec::SCS_static;
+
+  ParametricExpressionDecl *
+  New = ParametricExpressionDecl::Create(Context, CurContext,
+                                         NameInfo.getName(),
+                                         BeginLoc, TemplateDepth,
+                                         IsStatic, IsPackOp);
+  assert(New && "ParametricExpressionDecl::Create failed??");
+  New->setAccess(AS);
+  PushOnScopeChains(New, S);
+
+  return New;
+}
+
+bool Sema::CheckParametricExpressionParams(
+                      Scope *BodyScope, bool &NeedsRAII,
+                      ParametricExpressionDecl* New,
+                      MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo) {
+  SourceLocation PackLocation{};
+  SmallVector<ParmVarDecl*, 16> Params;
+
+  if (New->getThisContext() && ParamInfo.size() == 0) {
+    Diag(New->getBeginLoc(),
+         diag::err_member_parametric_expression_must_have_self_param);
+  }
+
+  for (auto& P : ParamInfo) {
+    assert(P.Param && "ParamInfo param decl must not be null");
+
+    ParmVarDecl *PD = dyn_cast<ParmVarDecl>(P.Param);
+    assert(PD && "ParamInfo::Param was not a ParmVarDecl");
+
+    if (!PD->isUsingSpecified()) {
+      NeedsRAII = true;
+    }
+
+    if (PD->isParameterPack()) {
+      if (PackLocation.isValid()) {
+        Diag(PD->getBeginLoc(),
+             diag::err_parametric_expression_multiple_parameter_packs);
+        Diag(PackLocation, diag::note_entity_declared_at)
+          << "Previous parameter pack";
+        return true;
+      }
+      else {
+        PackLocation = PD->getBeginLoc();
+      }
+    }
+
+    PD->setOwningFunction(New);
+
+    if (PD->getIdentifier()) {
+      CheckShadow(BodyScope, PD);
+      PushOnScopeChains(PD, BodyScope);
+    }
+
+    Params.push_back(PD);
+  }
+
+  New->setParams(Context, Params);
+  return false;
+}
+
+Decl *Sema::ActOnFinishParametricExpressionDecl(
+                                    ParametricExpressionDecl* New,
+                                    bool NeedsRAII,
+                                    StmtResult CompoundStmtResult) {
+  if (!New || CompoundStmtResult.isInvalid())
+    return nullptr;
+
+  // Body
+
+  CompoundStmt *CS = CompoundStmtResult.getAs<CompoundStmt>();
+  assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
+
+  // nullptr indicates an empty void expression
+  // If the body is empty it is just void.
+  // If the body is a single return statement, use the expression.
+  // Otherwise, just keep the compound-statement.
+  Stmt *Body = nullptr;
+  if (NeedsRAII) {
+    Body = CS;
+  } else if (!CS->body_empty()) {
+    ParametricExpressionReturnStmt *SingleReturn =
+      dyn_cast<ParametricExpressionReturnStmt>(CS->body_back());
+    if (CS->size() == 1 && SingleReturn) {
+      Body = SingleReturn->getRetValue();
+    } else {
+      Body = CS;
+    }
+  } else {
+    // Doesn't need RAII and the body is empty.
+    // This could just be a void expr
+    Body = CS;
+  }
+
+  if (NeedsRAII && New->isPackOp()) {
+    // pack op must be a "transparent" transformation
+    Diag(New->getBeginLoc(),
+         diag::err_parametric_expression_pack_op_transparent);
+  } else if (!NeedsRAII && !New->isPackOp() &&
+      static_cast<Expr*>(Body)->containsUnexpandedParameterPack()) {
+    // may not return pack unless specified in declarator
+    DiagnoseUnexpandedParameterPack(static_cast<Expr*>(Body),
+                                     UPPC_Expression);
+  } else if (New->isPackOp() &&
+      !static_cast<Expr*>(Body)->containsUnexpandedParameterPack()) {
+    Diag(Body->getBeginLoc(),
+         diag::err_parametric_expression_must_return_pack);
+  }
+
+  // Body isn't necessarily a compound statement so we will see
+  // how that flies since this is a member of FunctionDecl
+  New->setBody(Body);
+
+  return New;
+}
+
 Decl *Sema::ActOnNamespaceAliasDef(Scope *S, SourceLocation NamespaceLoc,
                                    SourceLocation AliasLoc,
                                    IdentifierInfo *Alias, CXXScopeSpec &SS,
