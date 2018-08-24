@@ -4672,6 +4672,9 @@ def ext_redefinition_of_typedef : ExtWarn<
 def err_redefinition_variably_modified_typedef : Error<
   "redefinition of %select{typedef|type alias}0 for variably-modified type %1">;
 
+def ext_redefinition_of_parametric_expression : Error<
+  "redefinition of parametric expression %0">,
+
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;
 def err_inline_declaration_block_scope : Error<

@@ -688,6 +688,19 @@ Parser::ParseUsingDeclaration(DeclaratorContext Context,
     return nullptr;
   }
 
+  // parametric-expression
+  if (Tok.is(tok::l_paren)) {
+    if (InvalidDeclarator) {
+      SkipUntil(tok::semi);
+      return nullptr;
+    }
+
+    Decl *DeclFromDeclSpec = nullptr;
+    Decl *AD = ParseParametricExpressionDeclarationAfterDeclarator(
+        UsingLoc, D, DeclEnd, AS, &DeclFromDeclSpec);
+    return Actions.ConvertDeclToDeclGroup(AD, DeclFromDeclSpec);
+  }
+
   SmallVector<Decl *, 8> DeclsInGroup;
   while (true) {
     // Parse (optional) attributes (most likely GNU strong-using extension).
@@ -813,6 +826,47 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
   return Actions.ActOnAliasDeclaration(getCurScope(), AS, TemplateParamsArg,
                                        UsingLoc, D.Name, Attrs, TypeAlias,
                                        DeclFromDeclSpec);
+}
+
+Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
+    SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
+    AccessSpecifier AS, Decl **OwnedType) {
+  if (ExpectAndConsume(tok::l_paren)) {
+    SkipUntil(tok::semi); // Would class members have a semi colon at the end?
+    return nullptr;
+  }
+
+  if (!getLangOpts().CPlusPlus2a) {
+    Diag(Tok.getLocation(), diag::warn_cxx2a_compat_parametric_expression_declaration);
+  }
+
+  // Name must be an identifier.
+  if (D.Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
+    Diag(D.Name.StartLocation, diag::err_alias_declaration_not_identifier);
+    // No removal fixit: can't recover from this.
+    SkipUntil(tok::semi);
+    return nullptr;
+  } else if (D.TypenameLoc.isValid()) {
+    Diag(D.TypenameLoc, diag::err_alias_declaration_not_identifier)
+        << FixItHint::CreateRemoval(SourceRange(
+               D.TypenameLoc,
+               D.SS.isNotEmpty() ? D.SS.getEndLoc() : D.TypenameLoc));
+  }
+  else if (D.SS.isNotEmpty()) {
+    Diag(D.SS.getBeginLoc(), diag::err_alias_declaration_not_identifier)
+      << FixItHint::CreateRemoval(D.SS.getRange());
+  }
+
+  SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;
+  ParsedAttributes attrs(AttrFactory);
+  SourceLocation EllipsisLoc; // ignore
+  ParseParameterDeclarationClause(D, attrs, ParamInfo,
+                                  EllipsisLoc);
+  StmtResult CompoundStmtResult(ParseCompoundStatementBody());
+  DeclEnd = Tok.getLocation();
+  return Actions.ActOnParametricExpressionDeclaration(getCurScope(), AS,
+                                       UsingLoc, D.Name, ParamInfo,
+                                       CompoundStmtResult, OwnedType);
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.

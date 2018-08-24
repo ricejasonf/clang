@@ -10533,6 +10533,31 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
+
+Decl *Sema::ActOnParametricExpressionDeclaration(Scope *S, AccessSpecifier AS,
+                                  SourceLocation UsingLoc, UnqualifiedId &Name,
+                                  MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
+                                  StmtResult CompoundStmtResult, Decl *DeclFromDeclSpec) {
+  DeclarationNameInfo NameInfo = GetNameFromUnqualifiedId(Name);
+  LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
+                        ForVisibleRedeclaration);
+  LookupName(Previous, S);
+  FilterLookupForScope(Previous, CurContext, S, /*ConsiderLinkage*/false,
+                       /*AllowInlineNamespace*/false);
+
+  if (!Previous.empty())
+  {
+    Diag(New->getLocation(), diag::ext_redefinition_of_parametric_expression)
+      << New->getDeclName();
+    notePreviousDefinition(Old, New->getLocation());
+    return nullptr;
+  }
+
+  // TODO finish
+  // TODO check the compound-statement to not have any returns outside of the last statement
+  // TODO check last statement to be a return or a constexpr if and then recurse to check each branch
+}
+
 Decl *Sema::ActOnNamespaceAliasDef(Scope *S, SourceLocation NamespaceLoc,
                                    SourceLocation AliasLoc,
                                    IdentifierInfo *Alias, CXXScopeSpec &SS,
