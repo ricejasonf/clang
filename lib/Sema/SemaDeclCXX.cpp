@@ -10533,8 +10533,7 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
-
-Decl *Sema::ActOnParametricExpressionDeclaration(Scope *S, AccessSpecifier AS,
+Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                   SourceLocation UsingLoc, UnqualifiedId &Name,
                                   MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                   StmtResult CompoundStmtResult, Decl *DeclFromDeclSpec) {
@@ -10558,9 +10557,12 @@ Decl *Sema::ActOnParametricExpressionDeclaration(Scope *S, AccessSpecifier AS,
     return nullptr;
   }
 
-  // TODO finish
-  // TODO check the compound-statement to not have any returns outside of the last statement
-  // TODO check last statement to be a return or a constexpr if and then recurse to check each branch
+  CheckParametricExpressionReturnStmt(CS);
+
+  // TODO validate Params
+  // TODO Implement BuildParametricExpressionDecl somewhere
+
+  return BuildParametricExpressionDecl(UsingLoc, Name, ParamInfo, CS);
 }
 
 namespace {
@@ -10579,55 +10581,59 @@ namespace {
   };
 }
 
-void CheckParametricExpressionReturnStmt(CompoundStmt *CS) {
-  if (CS.body_empty()) {
-    // empty body is invalid
+void CheckParametricExpressionReturnStmt(Stmt *S) {
+  if (!S) {
     SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
     return;
   }
 
-  // There should be no return statements except the last statement
-  FindReturnSmt Finder(*this);
-  for (auto *S : CS::body_range(CS.body_begin(), CS.body_end() - 1) {
-    if (!Finder.TraverseStmt(S)) {
-      // I guess we don't need to keep checking.
+  switch(S.getStmtClass()) {
+  case Stmt::ReturnStmtClass:
+    //   - return-statement
+    return;
+  }
+
+  case Stmt::CompoundStmtClass: {
+    //   - compound-statement
+    CompoundStmt* CS = cast<CompoundStmt>(S);
+    if (CS.body_empty()) {
+      // empty body is invalid
+      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
       return;
     }
+
+    // There should be no return statements except the last statement
+    FindReturnStmt Finder(*this);
+    for (auto *S : CS::body_range(CS.body_begin(), CS.body_end() - 1) {
+      if (!Finder.TraverseStmt(S)) {
+        // The finder found an invalid return statement
+        return;
+      }
+    }
+
+    // recurse to check the last statement in the compound statement
+    Stmt *LastStmt = CS.body_begin()[CS.size() - 1];
+    CheckParametricExpressionReturnStmt(LastStmt);
+    return;
   }
 
-  Stmt* LastStmt = CS.body_begin()[CS.size() - 1];
-  CheckParametricExpressionReturnStmt(LastStmt);
-}
-void CheckParametricExpressionReturnStmt(Stmt *LastStmt) {
-  assert(CS.getStmtClass() != CompoundStmtClass && "Expected overload to handle CompoundStmt");
-  // if this is not a CompoundStmt then we are dealing with the last statement
-
-  // The last statement must be a return or a constexpr if/else
-  bool IsLastStmtInvalid = true;
-  switch (LastStmt->getStmtClass()) {
-  case Stmt::ReturnStmtClass:
-    //   - return statement
-    IsLastStmtInvalid = false;
-    break;
-
-  case Stmt::IfStmt: {
+  case Stmt::IfStmtClass: {
     //   - constexpr if/else statement
-    IfStmt* If = static_cast<IfStmt*>(LastStmt);
-    if (If.isConstexpr() && If.getElse()) {
+    IfStmt* If = cast<IfStmt>(S);
+    if (If.isConstexpr()) {
       // recurse into the statement of each branch of the constexpr if/else
-      CheckParametricExpressionReturnStmt(
+      CheckParametricExpressionReturnStmt(If.getThen());
+      CheckParametricExpressionReturnStmt(If.getElse());
     }
     else {
-      IsLastStmtInvalid = false;
+      // the if statement must be constexpr
+      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
     }
 
-    break;
-  }
+    return;
 
   default:
-  }
-
-  if (IsLastStmtInvalid) {
+    // all other types of statements are not allowed
     SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
   }
 }
