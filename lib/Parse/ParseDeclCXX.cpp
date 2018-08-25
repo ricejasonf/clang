@@ -832,7 +832,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
     SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
     AccessSpecifier AS, Decl **OwnedType) {
   if (ExpectAndConsume(tok::l_paren)) {
-    SkipUntil(tok::semi); // Would class members have a semi colon at the end?
+    SkipUntil(tok::semi); // FIXME Would class members have a semi colon at the end?
     return nullptr;
   }
 
@@ -863,6 +863,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   ParseParameterDeclarationClause(D, attrs, ParamInfo,
                                   EllipsisLoc);
   StmtResult CompoundStmtResult(ParseCompoundStatementBody());
+
   DeclEnd = Tok.getLocation();
   return Actions.ActOnParametricExpressionDeclaration(getCurScope(), AS,
                                        UsingLoc, D.Name, ParamInfo,
