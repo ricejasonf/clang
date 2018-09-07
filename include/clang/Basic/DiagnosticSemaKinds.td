@@ -2010,7 +2010,8 @@ def err_auto_not_allowed : Error<
   "|in template argument|in typedef|in type alias|in function return type"
   "|in conversion function type|here|in lambda parameter"
   "|in type allocated by 'new'|in K&R-style function parameter"
-  "|in template parameter|in friend declaration}1">;
+  "|in template parameter|in friend declaration"
+  "|in parametric expression parameter}1">;
 def err_dependent_deduced_tst : Error<
   "typename specifier refers to "
   "%select{class template|function template|variable template|alias template|"
@@ -4672,8 +4673,16 @@ def ext_redefinition_of_typedef : ExtWarn<
 def err_redefinition_variably_modified_typedef : Error<
   "redefinition of %select{typedef|type alias}0 for variably-modified type %1">;
 
-def ext_redefinition_of_parametric_expression : Error<
+def err_redefinition_of_parametric_expression : Error<
   "redefinition of parametric expression %0">,
+def err_parametric_expression_var_arg : Error<
+  "C style variadic function ellipsis not allowed in parametric expression declarator">,
+def err_parametric_expression_multiple_parameter_packs : Error<
+  "Parametric expression parameter list may contain only one parameter pack">,
+def err_parametric_expression_requires_constraint : Error<
+  "Parametric expression parameter specifier must be constraint that is auto">,
+def err_parametric_expression_constraint_has_qualifiers : Error<
+  "Parametric expression parameter constraint must not have qualifiers">,
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;

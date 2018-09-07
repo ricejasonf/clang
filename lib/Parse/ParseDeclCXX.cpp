@@ -832,9 +832,12 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
     SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
     AccessSpecifier AS, Decl **OwnedType) {
   if (ExpectAndConsume(tok::l_paren)) {
-    SkipUntil(tok::semi); // FIXME Would class members have a semi colon at the end?
+    // TODO there should not be semicolons so do we skip?
+    // SkipUntil(tok::semi);
     return nullptr;
   }
+
+  // TODO The declarator context should be DeclaratorContext::ParametricExpressionContext
 
   if (!getLangOpts().CPlusPlus2a) {
     Diag(Tok.getLocation(), diag::warn_cxx2a_compat_parametric_expression_declaration);
@@ -844,30 +847,47 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   if (D.Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(D.Name.StartLocation, diag::err_alias_declaration_not_identifier);
     // No removal fixit: can't recover from this.
-    SkipUntil(tok::semi);
+    // TODO there should not be semicolons so do we skip?
+    // SkipUntil(tok::semi);
     return nullptr;
   } else if (D.TypenameLoc.isValid()) {
     Diag(D.TypenameLoc, diag::err_alias_declaration_not_identifier)
         << FixItHint::CreateRemoval(SourceRange(
                D.TypenameLoc,
                D.SS.isNotEmpty() ? D.SS.getEndLoc() : D.TypenameLoc));
-  }
-  else if (D.SS.isNotEmpty()) {
+  } else if (D.SS.isNotEmpty()) {
     Diag(D.SS.getBeginLoc(), diag::err_alias_declaration_not_identifier)
       << FixItHint::CreateRemoval(D.SS.getRange());
   }
 
+  if (D.EllipsisLoc.isValid()) {
+    Diag(D.EllipsisLoc, diag::err_alias_declaration_pack_expansion)
+      << FixItHint::CreateRemoval(SourceRange(D.EllipsisLoc));
+  }
+
+  DeclSpec DS(AttrFactory);
+  Declarator ParametricExpressionDeclarator(DS, DeclaratorContext::ParametricExpressionContext);
+  ParametricExpressionDeclarator.setIdentifier(D.Name.Identifier, D.Name.getLocation());
   SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;
   ParsedAttributes attrs(AttrFactory);
-  SourceLocation EllipsisLoc; // ignore
-  ParseParameterDeclarationClause(D, attrs, ParamInfo,
-                                  EllipsisLoc);
+  SourceLocation EllipsisLoc;
+  ParseParameterDeclarationClause(ParametricExpressionDeclarator,
+                                  nullptr, ParamInfo, EllipsisLoc);
+
   StmtResult CompoundStmtResult(ParseCompoundStatementBody());
 
   DeclEnd = Tok.getLocation();
-  return Actions.ActOnParametricExpressionDeclaration(getCurScope(), AS,
-                                       UsingLoc, D.Name, ParamInfo,
-                                       CompoundStmtResult, OwnedType);
+  return Actions.ActOnParametricExpressionDecl(getCurScope(), AS, UsingLoc,
+                                               ParametricExpressionDeclarator,
+                                               ParamInfo, CompoundStmtResult,
+                                               OwnedType);
+}
+
+void Parser::ParseParametricExpressionParams(
+    SmallVectorImpl<DeclaratorChunk::ParamInfo> &ParamInfo) {
+
+  Declarator
+  ParseParameterDeclarationClause
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.

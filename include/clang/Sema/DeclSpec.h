@@ -1745,7 +1745,9 @@ enum class DeclaratorContext {
     TemplateArgContext,  // Any template argument (in template argument list).
     TemplateTypeArgContext, // Template type argument (in default argument).
     AliasDeclContext,    // C++11 alias-declaration.
-    AliasTemplateContext // C++11 alias-declaration template.
+    AliasTemplateContext, // C++11 alias-declaration template.
+    ParametricExpressionContext // C++2a parametric expression declarator
+    ParametricExpressionParameterContext // C++2a parametric expression parameter declarator
 };
 
 
@@ -1972,6 +1974,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return true;
     }
     llvm_unreachable("unknown context kind!");
@@ -1994,6 +1998,7 @@ public:
     case DeclaratorContext::TemplateParamContext:
     case DeclaratorContext::CXXCatchContext:
     case DeclaratorContext::ObjCCatchContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return true;
 
     case DeclaratorContext::TypeNameContext:
@@ -2010,6 +2015,7 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2052,6 +2058,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2107,6 +2115,8 @@ public:
     case DeclaratorContext::TemplateArgContext:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2328,6 +2338,8 @@ public:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
     }
     llvm_unreachable("unknown context kind!");
@@ -2361,6 +2373,8 @@ public:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
     case DeclaratorContext::TemplateTypeArgContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       return false;
 
     case DeclaratorContext::BlockContext:

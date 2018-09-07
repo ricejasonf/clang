@@ -2883,6 +2883,12 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
             T, QualType(CorrespondingTemplateParam->getTypeForDecl(), 0));
       }
       break;
+    case DeclaratorContext::ParametricExpressionParameterContext:
+      // Parametric Expression requires `auto` as a constraint
+      if (!SemaRef.getLangOpts().CPlusPlus2a ||
+          !Auto || Auto->getKeyword() != AutoTypeKeyword::Auto)
+        Error = 21; // in parametric expression parameter
+      break;
     case DeclaratorContext::MemberContext: {
       if (D.getDeclSpec().getStorageClassSpec() == DeclSpec::SCS_static ||
           D.isFunctionDeclarator())
@@ -3067,6 +3073,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
       break;
     case DeclaratorContext::PrototypeContext:
     case DeclaratorContext::LambdaExprParameterContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
     case DeclaratorContext::ObjCParameterContext:
     case DeclaratorContext::ObjCResultContext:
     case DeclaratorContext::KNRTypeListContext:
@@ -4073,6 +4080,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::InitStmtContext:
     case DeclaratorContext::LambdaExprContext:
     case DeclaratorContext::LambdaExprParameterContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
     case DeclaratorContext::ObjCCatchContext:
     case DeclaratorContext::TemplateParamContext:
     case DeclaratorContext::TemplateArgContext:
@@ -4951,6 +4959,8 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     switch (D.getContext()) {
     case DeclaratorContext::PrototypeContext:
     case DeclaratorContext::LambdaExprParameterContext:
+      // TODO JASON - should ParametricExpressionParameterContext be here?
+
       // C++0x [dcl.fct]p13:
       //   [...] When it is part of a parameter-declaration-clause, the
       //   parameter pack is a function parameter pack (14.5.3). The type T

@@ -5589,6 +5589,7 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
     if (Tok.is(tok::ellipsis) && D.getCXXScopeSpec().isEmpty() &&
         !((D.getContext() == DeclaratorContext::PrototypeContext ||
            D.getContext() == DeclaratorContext::LambdaExprParameterContext ||
+           D.getContext() == DeclaratorContext::ExprAliasContext ||
            D.getContext() == DeclaratorContext::BlockLiteralContext) &&
           NextToken().is(tok::r_paren) &&
           !D.hasGroupingParens() &&
@@ -6390,14 +6391,19 @@ void Parser::ParseParameterDeclarationClause(
 
     ParseDeclarationSpecifiers(DS);
 
+    // Parse the declarator.  This is "PrototypeContext", 
+    // "LambdaExprParameterContext", or "ParametricExpressionContext"
+    // because we must accept either 'declarator' or 'abstract-declarator' here.
+    DeclaratorContext ParamContext;
+    if (D.getContext() == DeclaratorContext::LambdaExprContext) {
+      ParamContext = DeclaratorContext::LambdaExprParameterContext;
+    } else if (D.getContext() == DeclaratorContext::ParametricExpressionContext) {
+      ParamContext = DeclaratorContext::ParametricExpressionParameterContext;
+    } else {
+      ParamContext = DeclaratorContext::PrototypeContext;
+    }
 
-    // Parse the declarator.  This is "PrototypeContext" or
-    // "LambdaExprParameterContext", because we must accept either
-    // 'declarator' or 'abstract-declarator' here.
-    Declarator ParmDeclarator(
-        DS, D.getContext() == DeclaratorContext::LambdaExprContext
-                ? DeclaratorContext::LambdaExprParameterContext
-                : DeclaratorContext::PrototypeContext);
+    Declarator ParmDeclarator(DS, ParamContext);
     ParseDeclarator(ParmDeclarator);
 
     // Parse GNU attributes, if present.

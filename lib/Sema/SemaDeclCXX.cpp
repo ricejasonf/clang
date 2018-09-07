@@ -10534,16 +10534,18 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 }
 
 Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
-                                  SourceLocation UsingLoc, UnqualifiedId &Name,
-                                  MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                  StmtResult CompoundStmtResult, Decl *DeclFromDeclSpec) {
+                                          SourceLocation UsingLoc,
+                                          Declarator ParametricExpressionDeclarator,
+                                          MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
+                                          StmtResult CompoundStmtResult) {
   if (CompoundStmtResult.isInvalid()) {
     return nullptr;
   }
 
   CompoundStmt* CS = CompoundStmtResult.get();
 
-  DeclarationNameInfo NameInfo = GetNameFromUnqualifiedId(Name);
+  DeclarationNameInfo NameInfo = GetNameFromUnqualifiedId(
+      ParametricExpressionDeclarator.Name);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
                         ForVisibleRedeclaration);
   LookupName(Previous, S);
@@ -10551,17 +10553,54 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                        /*AllowInlineNamespace*/false);
 
   if (!Previous.empty()) {
-    Diag(New->getLocation(), diag::ext_redefinition_of_parametric_expression)
-      << New->getDeclName();
-    notePreviousDefinition(Old, New->getLocation());
+    Diag(UsingLoc, diag::err_redefinition_of_parametric_expression)
+      << ParametricExpressionDeclarator.Name;
+    notePreviousDefinition(Previous.getRepresentativeDecl().getLocation(),
+                           ParametricExpressionDeclarator->getLocation());
     return nullptr;
+  }
+
+  // C style variadic function syntax is not allowed in parametric expression
+  // parameter list
+  if (ParametricExpressionDeclarator.hasEllipsis()) {
+    Diag(ParametricExpressionDeclarator->getLocation(), diag::err_parametric_expression_vararg)
+      << ParametricExpressionDeclarator->getDeclName();
+    return nullptr;
+  }
+
+  SourceLocation PackLocation{};
+  for (auto& P : ParamInfo) {
+    assert(P.Param && "ParamInfo param decl must not be null");
+
+    // Checking for auto and no qualifiers could probably be done
+    // somewhere else where the DeclSpec is still available
+    Auto* A = P.Param.getTypeSourceInfo()->getContainedAutoType();
+    if (!A) {
+      Diag(P.getLocation, diag::err_parametric_expression_requires_constraint);
+      return nullptr;
+    }
+
+    if (A->hasLocalQualifiers()) {
+      Diag(P.getLocation, diag::err_parametric_expression_constraint_has_qualifiers);
+      return nullptr;
+    }
+
+    if (P.isParameterPack()) {
+      if (PackLocation.isValid()) {
+        Diag(P.getLocation(), diag::err_parametric_expression_multiple_parameter_packs);
+        Diag(PackLocation, diag::note_entity_declared_at)
+          << "Previous parameter pack";
+        return nullptr;
+      }
+      else {
+        PackLocation = P.getLocation();
+      }
+    } 
   }
 
   CheckParametricExpressionReturnStmt(CS);
 
-  // TODO validate Params
   // TODO Implement BuildParametricExpressionDecl somewhere
-
   return BuildParametricExpressionDecl(UsingLoc, Name, ParamInfo, CS);
 }
 
