@@ -10622,62 +10622,62 @@ namespace {
       return false;
     }
   };
-}
 
-void Sema::CheckParametricExpressionReturnStmt(Stmt *S) {
-  if (!S) {
-    SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-    return;
-  }
-
-  switch(S.getStmtClass()) {
-  case Stmt::ReturnStmtClass:
-    //   - return-statement
-    return;
-  }
-
-  case Stmt::CompoundStmtClass: {
-    //   - compound-statement
-    CompoundStmt* CS = cast<CompoundStmt>(S);
-    if (CS.body_empty()) {
-      // empty body is invalid
+  void CheckParametricExpressionReturnStmt(Stmt *S) {
+    if (!S) {
       SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
       return;
     }
 
-    // There should be no return statements except the last statement
-    FindReturnStmt Finder(*this);
-    for (auto *S : CS::body_range(CS.body_begin(), CS.body_end() - 1) {
-      if (!Finder.TraverseStmt(S)) {
-        // The finder found an invalid return statement
+    switch(S.getStmtClass()) {
+    case Stmt::ReturnStmtClass:
+      //   - return-statement
+      return;
+    }
+
+    case Stmt::CompoundStmtClass: {
+      //   - compound-statement
+      CompoundStmt* CS = cast<CompoundStmt>(S);
+      if (CS.body_empty()) {
+        // empty body is invalid
+        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
         return;
       }
+
+      // There should be no return statements except the last statement
+      FindReturnStmt Finder(*this);
+      for (auto *S : CS::body_range(CS.body_begin(), CS.body_end() - 1) {
+        if (!Finder.TraverseStmt(S)) {
+          // The finder found an invalid return statement
+          return;
+        }
+      }
+
+      // recurse to check the last statement in the compound statement
+      Stmt *LastStmt = CS.body_begin()[CS.size() - 1];
+      CheckParametricExpressionReturnStmt(LastStmt);
+      return;
     }
 
-    // recurse to check the last statement in the compound statement
-    Stmt *LastStmt = CS.body_begin()[CS.size() - 1];
-    CheckParametricExpressionReturnStmt(LastStmt);
-    return;
-  }
+    case Stmt::IfStmtClass: {
+      //   - constexpr if/else statement
+      IfStmt* If = cast<IfStmt>(S);
+      if (If.isConstexpr()) {
+        // recurse into the statement of each branch of the constexpr if/else
+        CheckParametricExpressionReturnStmt(If.getThen());
+        CheckParametricExpressionReturnStmt(If.getElse());
+      }
+      else {
+        // the if statement must be constexpr
+        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
+      }
 
-  case Stmt::IfStmtClass: {
-    //   - constexpr if/else statement
-    IfStmt* If = cast<IfStmt>(S);
-    if (If.isConstexpr()) {
-      // recurse into the statement of each branch of the constexpr if/else
-      CheckParametricExpressionReturnStmt(If.getThen());
-      CheckParametricExpressionReturnStmt(If.getElse());
-    }
-    else {
-      // the if statement must be constexpr
+      return;
+
+    default:
+      // all other types of statements are not allowed
       SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
     }
-
-    return;
-
-  default:
-    // all other types of statements are not allowed
-    SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
   }
 }
 
