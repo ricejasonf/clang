@@ -10568,6 +10568,10 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     return nullptr;
   }
 
+  // The limit of 16 is provisional
+  if (ParamInfo.size() > 16)
+    Diag(ParametricExpressionDeclarator->getLocation(), diag::err_parametric_expression_param_list_limit);
+
   SourceLocation PackLocation{};
   for (auto& P : ParamInfo) {
     assert(P.Param && "ParamInfo param decl must not be null");
@@ -10600,7 +10604,7 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
 
   CheckParametricExpressionReturnStmt(CS);
 
-  // TODO Implement BuildParametricExpressionDecl somewhere
+  // TODO create the decl and return it
   return BuildParametricExpressionDecl(UsingLoc, Name, ParamInfo, CS);
 }
 
@@ -10620,7 +10624,7 @@ namespace {
   };
 }
 
-void CheckParametricExpressionReturnStmt(Stmt *S) {
+void Sema::CheckParametricExpressionReturnStmt(Stmt *S) {
   if (!S) {
     SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
     return;

@@ -3946,6 +3946,31 @@ const DiagnosticBuilder &operator<<(const DiagnosticBuilder &DB,
 const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
                                     AccessSpecifier AS);
 
+// ParametricExpressionDecl
+class ParametricExpressionDecl : public NamedDecl {
+  CompoundStmt* Body;
+  SourceLocation LocStart;
+  unsigned NumParams;
+  NamedDecl* Params[16];
+
+public:
+  ParametricExpressionDecl(DeclContext *DC, SourceLocation IdentL, DeclarationName DN,
+                           CompoundStmt* B, SourceLocation StartL,
+                           DeclarationName
+                           DeclaratorChunk::ParamInfo* ParamChunks,
+                           unsigned NP);
+
+  unsigned getNumParams() const { return NumParams; }
+
+  // ArrayRef interface to parameters.
+  ArrayRef<NamedDecl *> parameters() const {
+    return {Params, getNumParams()};
+  }
+  MutableArrayRef<NamedDecl *> parameters() {
+    return {Params, getNumParams()};
+  }
+};
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_DECLCXX_H

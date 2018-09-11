@@ -19,6 +19,7 @@ def ExternCContext : Decl, DeclContext;
 def Named : Decl<"named declarations", 1>;
   def Namespace : DDecl<Named, "namespaces">, DeclContext;
   def UsingDirective : DDecl<Named>;
+  def ParametricExpression : DDecl<Named>;
   def NamespaceAlias : DDecl<Named>;
   def Label : DDecl<Named, "labels">;
   def Type : DDecl<Named, "types", 1>;

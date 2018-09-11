@@ -4683,6 +4683,9 @@ def err_parametric_expression_requires_constraint : Error<
   "Parametric expression parameter specifier must be constraint that is auto">,
 def err_parametric_expression_constraint_has_qualifiers : Error<
   "Parametric expression parameter constraint must not have qualifiers">,
+def err_parametric_expression_param_list_limit : Error<
+  "Parametric expression has too many parameters: "
+  "at most 16 are expected.">,
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;

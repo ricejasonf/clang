@@ -2912,3 +2912,17 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
                                            AccessSpecifier AS) {
   return DB << getAccessName(AS);
 }
+
+ParametricExpressionDecl::ParametricExpressionDecl(
+                      DeclContext *DC, SourceLocation IdentL, DeclarationName DN,
+                      CompoundStmt* B, SourceLocation StartL,
+                      DeclaratorChunk::ParamInfo* ParamChunks,
+                      unsigned NP)
+    : NamedDecl(Label, DC, IdentL, DN), Body(B), LocStart(StartL), NumParams(NP) {
+  assert(NumParams < 16
+      && "ParametricExpressionDecl currently only supports 16 parameters in the parameter list.");
+  for (int i = 0; i < NumParams; i++) {
+    if (ParamChunks[i].Param)
+      Params[i] = ParamChunks[i].Param;
+  }
+}
