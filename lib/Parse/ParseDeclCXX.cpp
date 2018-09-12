@@ -867,27 +867,19 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
 
   DeclSpec DS(AttrFactory);
   Declarator ParametricExpressionDeclarator(DS, DeclaratorContext::ParametricExpressionContext);
-  ParametricExpressionDeclarator.setIdentifier(D.Name.Identifier, D.Name.getLocation());
+  ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier, D.Name.getBeginLoc());
   SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;
   ParsedAttributes attrs(AttrFactory);
   SourceLocation EllipsisLoc;
   ParseParameterDeclarationClause(ParametricExpressionDeclarator,
-                                  nullptr, ParamInfo, EllipsisLoc);
+                                  attrs, ParamInfo, EllipsisLoc);
 
   StmtResult CompoundStmtResult(ParseCompoundStatementBody());
 
   DeclEnd = Tok.getLocation();
   return Actions.ActOnParametricExpressionDecl(getCurScope(), AS, UsingLoc,
                                                ParametricExpressionDeclarator,
-                                               ParamInfo, CompoundStmtResult,
-                                               OwnedType);
-}
-
-void Parser::ParseParametricExpressionParams(
-    SmallVectorImpl<DeclaratorChunk::ParamInfo> &ParamInfo) {
-
-  Declarator
-  ParseParameterDeclarationClause
+                                               ParamInfo, CompoundStmtResult);
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.

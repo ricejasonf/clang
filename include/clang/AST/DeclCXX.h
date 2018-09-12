@@ -3950,17 +3950,23 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
 class ParametricExpressionDecl : public NamedDecl {
   CompoundStmt* Body;
   SourceLocation LocStart;
-  unsigned NumParams;
-  NamedDecl* Params[16];
+  ParmVarDecl **ParamInfo = nullptr;
+  unsigned NumParams = 0;
+
+protected:
+  ParametricExpressionDecl(ASTContext &C, DeclContext *DC, DeclarationNameInfo* DN,
+                           CompoundStmt *B, SourceLocation StartL)
+    : NamedDecl(Label, DC, DN.getLoc(), DN.getInfo()), Body(B), LocStart(StartL) {}
 
 public:
-  ParametricExpressionDecl(DeclContext *DC, SourceLocation IdentL, DeclarationName DN,
-                           CompoundStmt* B, SourceLocation StartL,
-                           DeclarationName
-                           DeclaratorChunk::ParamInfo* ParamChunks,
-                           unsigned NP);
+  static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
+                                          DeclarationNameInfo* DN,
+                                          CompoundStmt *B, SourceLocation StartL);
+
+  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
 
   unsigned getNumParams() const { return NumParams; }
+
 
   // ArrayRef interface to parameters.
   ArrayRef<NamedDecl *> parameters() const {

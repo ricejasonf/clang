@@ -5589,7 +5589,7 @@ void Parser::ParseDirectDeclarator(Declarator &D) {
     if (Tok.is(tok::ellipsis) && D.getCXXScopeSpec().isEmpty() &&
         !((D.getContext() == DeclaratorContext::PrototypeContext ||
            D.getContext() == DeclaratorContext::LambdaExprParameterContext ||
-           D.getContext() == DeclaratorContext::ExprAliasContext ||
+           D.getContext() == DeclaratorContext::ParametricExpressionParameterContext ||
            D.getContext() == DeclaratorContext::BlockLiteralContext) &&
           NextToken().is(tok::r_paren) &&
           !D.hasGroupingParens() &&

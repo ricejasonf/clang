@@ -10535,7 +10535,7 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 
 Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                           SourceLocation UsingLoc,
-                                          Declarator ParametricExpressionDeclarator,
+                                          const Declarator &ParametricExpressionDeclarator,
                                           MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                           StmtResult CompoundStmtResult) {
   if (CompoundStmtResult.isInvalid()) {
@@ -10567,10 +10567,6 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
       << ParametricExpressionDeclarator->getDeclName();
     return nullptr;
   }
-
-  // The limit of 16 is provisional
-  if (ParamInfo.size() > 16)
-    Diag(ParametricExpressionDeclarator->getLocation(), diag::err_parametric_expression_param_list_limit);
 
   SourceLocation PackLocation{};
   for (auto& P : ParamInfo) {
@@ -10604,8 +10600,18 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
 
   CheckParametricExpressionReturnStmt(CS);
 
-  // TODO create the decl and return it
-  return BuildParametricExpressionDecl(UsingLoc, Name, ParamInfo, CS);
+  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, NameInfo, CS, UsingLoc);
+
+  if (ParamInfo.size() > 0) {
+    SmallVector<ParmVarDecl*, 16> Params;
+    for (int i = 0, e = ParamInfo.size(); i != e; ++i) {
+      Params[i] = ParamChunks[i].Param;
+    }
+
+    New->setParams(Params);
+  }
+
+  return New;
 }
 
 namespace {

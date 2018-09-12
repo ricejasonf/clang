@@ -4669,6 +4669,13 @@ public:
                               const ParsedAttributesView &AttrList,
                               TypeResult Type, Decl *DeclFromDeclSpec);
 
+  Decl *ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
+                                      SourceLocation UsingLoc,
+                                      const Declarator &ParametricExpressionDeclarator,
+                                      MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
+                                      StmtResult CompoundStmtResult);
+
+
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,
   /// including handling of its default argument expressions.
   ///

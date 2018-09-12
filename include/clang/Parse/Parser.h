@@ -2685,6 +2685,11 @@ private:
       UsingDeclarator &D, SourceLocation &DeclEnd, AccessSpecifier AS,
       ParsedAttributes &Attrs, Decl **OwnedType = nullptr);
 
+  Decl *ParseParametricExpressionDeclarationAfterDeclarator(
+    SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
+    AccessSpecifier AS, Decl **OwnedType = nullptr);
+
+
   Decl *ParseStaticAssertDeclaration(SourceLocation &DeclEnd);
   Decl *ParseNamespaceAlias(SourceLocation NamespaceLoc,
                             SourceLocation AliasLoc, IdentifierInfo *Alias,

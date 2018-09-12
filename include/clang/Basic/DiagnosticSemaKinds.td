@@ -4674,18 +4674,15 @@ def err_redefinition_variably_modified_typedef : Error<
   "redefinition of %select{typedef|type alias}0 for variably-modified type %1">;
 
 def err_redefinition_of_parametric_expression : Error<
-  "redefinition of parametric expression %0">,
+  "redefinition of parametric expression %0">;
 def err_parametric_expression_var_arg : Error<
-  "C style variadic function ellipsis not allowed in parametric expression declarator">,
+  "C style variadic function ellipsis not allowed in parametric expression declarator">;
 def err_parametric_expression_multiple_parameter_packs : Error<
-  "Parametric expression parameter list may contain only one parameter pack">,
+  "Parametric expression parameter list may contain only one parameter pack">;
 def err_parametric_expression_requires_constraint : Error<
-  "Parametric expression parameter specifier must be constraint that is auto">,
+  "Parametric expression parameter specifier must be constraint that is auto">;
 def err_parametric_expression_constraint_has_qualifiers : Error<
-  "Parametric expression parameter constraint must not have qualifiers">,
-def err_parametric_expression_param_list_limit : Error<
-  "Parametric expression has too many parameters: "
-  "at most 16 are expected.">,
+  "Parametric expression parameter constraint must not have qualifiers">;
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;

@@ -1746,7 +1746,7 @@ enum class DeclaratorContext {
     TemplateTypeArgContext, // Template type argument (in default argument).
     AliasDeclContext,    // C++11 alias-declaration.
     AliasTemplateContext, // C++11 alias-declaration template.
-    ParametricExpressionContext // C++2a parametric expression declarator
+    ParametricExpressionContext, // C++2a parametric expression declarator
     ParametricExpressionParameterContext // C++2a parametric expression parameter declarator
 };
 

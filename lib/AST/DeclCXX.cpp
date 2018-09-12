@@ -2913,16 +2913,24 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
   return DB << getAccessName(AS);
 }
 
-ParametricExpressionDecl::ParametricExpressionDecl(
-                      DeclContext *DC, SourceLocation IdentL, DeclarationName DN,
-                      CompoundStmt* B, SourceLocation StartL,
-                      DeclaratorChunk::ParamInfo* ParamChunks,
-                      unsigned NP)
-    : NamedDecl(Label, DC, IdentL, DN), Body(B), LocStart(StartL), NumParams(NP) {
-  assert(NumParams < 16
-      && "ParametricExpressionDecl currently only supports 16 parameters in the parameter list.");
-  for (int i = 0; i < NumParams; i++) {
-    if (ParamChunks[i].Param)
-      Params[i] = ParamChunks[i].Param;
+static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC, SourceLocation IdentL,
+                                        DeclarationName DN, CompoundStmt* B,
+                                        SourceLocation StartL) {
+  ParametricExpressionDecl *New =
+      new (C, DC) ParametricExpressionDecl(C, DC, StartLoc, NameInfo, T, TInfo,
+                                           SC, isInlineSpecified, isConstexprSpecified);
+  return New;
+}
+
+
+void ParametricExpressionDecl::setParams(ASTContext &C,
+                                         ArrayRef<ParmVarDecl *> NewParamInfo) {
+  assert(!ParamInfo && "Already has param info!");
+  NumParams = NewParamInfo.size();
+
+  // Zero params -> null pointer.
+  if (!NewParamInfo.empty()) {
+    ParamInfo = new (C) ParmVarDecl*[NewParamInfo.size()];
+    std::copy(NewParamInfo.begin(), NewParamInfo.end(), ParamInfo);
   }
 }
