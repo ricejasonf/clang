@@ -10533,19 +10533,94 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
+namespace {
+  /// AST visitor that finds invalid return statements
+  /// for parametric expressions where they are prohibited
+  class FindReturnStmt : public RecursiveASTVisitor<FindReturnStmt> {
+    Sema &SemaRef;
+
+  public:
+    explicit FindReturnStmt(Sema &S) : SemaRef(S) { }
+
+    bool VisitReturnStmt(ReturnStmt *E) {
+      SemaRef.Diag(E->getBeginLoc(), diag::err_parametric_expression_invalid_return_stmt);
+      return false;
+    }
+  };
+
+  void CheckParametricExpressionReturnStmt(Sema& SemaRef, Stmt *S) {
+    if (!S) {
+      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
+      return;
+    }
+
+    switch(S->getStmtClass()) {
+    case Stmt::ReturnStmtClass:
+      //   - return-statement
+      return;
+
+    case Stmt::CompoundStmtClass: {
+      //   - compound-statement
+      CompoundStmt* CS = cast<CompoundStmt>(S);
+      if (CS->body_empty()) {
+        // empty body is invalid
+        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
+        return;
+      }
+
+      // There should be no return statements except the last statement
+      FindReturnStmt Finder(SemaRef);
+      for (auto *S : CompoundStmt::body_range(CS->body_begin(), CS->body_end() - 1)) {
+        if (!Finder.TraverseStmt(S)) {
+          // The finder found an invalid return statement
+          return;
+        }
+      }
+
+      // recurse to check the last statement in the compound statement
+      Stmt *LastStmt = CS->body_begin()[CS->size() - 1];
+      CheckParametricExpressionReturnStmt(SemaRef, LastStmt);
+      return;
+    }
+
+    case Stmt::IfStmtClass: {
+      //   - constexpr if/else statement
+      IfStmt* If = cast<IfStmt>(S);
+      if (If->isConstexpr()) {
+        // recurse into the statement of each branch of the constexpr if/else
+        CheckParametricExpressionReturnStmt(SemaRef, If->getThen());
+        CheckParametricExpressionReturnStmt(SemaRef, If->getElse());
+      }
+      else {
+        // the if statement must be constexpr
+        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
+      }
+
+      return;
+    }
+
+    default:
+      // all other types of statements are not allowed
+      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
+
+      return;
+    }
+  }
+}
+
 Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                           SourceLocation UsingLoc,
-                                          const Declarator &ParametricExpressionDeclarator,
+                                          Declarator &ParametricExpressionDeclarator,
                                           MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                           StmtResult CompoundStmtResult) {
-  if (CompoundStmtResult.isInvalid()) {
+  if (CompoundStmtResult.isInvalid())
     return nullptr;
-  }
 
-  CompoundStmt* CS = CompoundStmtResult.get();
+  CompoundStmt* CS = CompoundStmtResult.getAs<CompoundStmt>();
+  assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
 
-  DeclarationNameInfo NameInfo = GetNameFromUnqualifiedId(
-      ParametricExpressionDeclarator.Name);
+  DeclarationNameInfo NameInfo = GetNameForDeclarator(
+      ParametricExpressionDeclarator);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
                         ForVisibleRedeclaration);
   LookupName(Previous, S);
@@ -10554,17 +10629,17 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
 
   if (!Previous.empty()) {
     Diag(UsingLoc, diag::err_redefinition_of_parametric_expression)
-      << ParametricExpressionDeclarator.Name;
-    notePreviousDefinition(Previous.getRepresentativeDecl().getLocation(),
-                           ParametricExpressionDeclarator->getLocation());
+      << NameInfo.getName();
+    notePreviousDefinition(Previous.getRepresentativeDecl(),
+                           ParametricExpressionDeclarator.getBeginLoc());
     return nullptr;
   }
 
   // C style variadic function syntax is not allowed in parametric expression
   // parameter list
   if (ParametricExpressionDeclarator.hasEllipsis()) {
-    Diag(ParametricExpressionDeclarator->getLocation(), diag::err_parametric_expression_vararg)
-      << ParametricExpressionDeclarator->getDeclName();
+    Diag(ParametricExpressionDeclarator.getBeginLoc(), diag::err_parametric_expression_vararg)
+      << NameInfo.getName();
     return nullptr;
   }
 
@@ -10574,117 +10649,49 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
 
     // Checking for auto and no qualifiers could probably be done
     // somewhere else where the DeclSpec is still available
-    Auto* A = P.Param.getTypeSourceInfo()->getContainedAutoType();
+    ParmVarDecl *PD = dyn_cast<ParmVarDecl>(P.Param);
+    assert(PD && "ParamInfo::Param was not a ParmVarDecl");
+
+    AutoType* A = PD->getType()->getContainedAutoType();
     if (!A) {
-      Diag(P.getLocation, diag::err_parametric_expression_requires_constraint);
+      Diag(PD->getBeginLoc(), diag::err_parametric_expression_requires_constraint);
       return nullptr;
     }
 
-    if (A->hasLocalQualifiers()) {
-      Diag(P.getLocation, diag::err_parametric_expression_constraint_has_qualifiers);
+    if (PD->getType().hasLocalQualifiers()) {
+      Diag(PD->getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
       return nullptr;
     }
 
-    if (P.isParameterPack()) {
+    if (PD->isParameterPack()) {
       if (PackLocation.isValid()) {
-        Diag(P.getLocation(), diag::err_parametric_expression_multiple_parameter_packs);
+        Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);
         Diag(PackLocation, diag::note_entity_declared_at)
           << "Previous parameter pack";
         return nullptr;
       }
       else {
-        PackLocation = P.getLocation();
+        PackLocation = PD->getBeginLoc();
       }
     } 
   }
 
-  CheckParametricExpressionReturnStmt(CS);
+  CheckParametricExpressionReturnStmt(*this, CS);
 
   ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, NameInfo, CS, UsingLoc);
 
   if (ParamInfo.size() > 0) {
     SmallVector<ParmVarDecl*, 16> Params;
     for (int i = 0, e = ParamInfo.size(); i != e; ++i) {
-      Params[i] = ParamChunks[i].Param;
+      ParmVarDecl *PD = dyn_cast<ParmVarDecl>(ParamInfo[i].Param);
+      assert(PD && "ParamInfo::Param was not a ParmVarDecl");
+      Params.push_back(PD);
     }
 
-    New->setParams(Params);
+    New->setParams(Context, Params);
   }
 
   return New;
-}
-
-namespace {
-  /// AST visitor that finds invalid return statements
-  /// for parametric expressions where they are prohibited
-  class FindReturnStmt : public RecursiveASTVisitor<FindReturnStmt> {
-    Sema &S;
-
-  public:
-    explicit FindReturnStmt(Sema &S) : S(S) { }
-
-    bool VisitReturnStmt(ReturnStmt *E) {
-      S.Diag(E->getLocation(), diag::err_invalid_return_parametric_expression);
-      return false;
-    }
-  };
-
-  void CheckParametricExpressionReturnStmt(Stmt *S) {
-    if (!S) {
-      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-      return;
-    }
-
-    switch(S.getStmtClass()) {
-    case Stmt::ReturnStmtClass:
-      //   - return-statement
-      return;
-    }
-
-    case Stmt::CompoundStmtClass: {
-      //   - compound-statement
-      CompoundStmt* CS = cast<CompoundStmt>(S);
-      if (CS.body_empty()) {
-        // empty body is invalid
-        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-        return;
-      }
-
-      // There should be no return statements except the last statement
-      FindReturnStmt Finder(*this);
-      for (auto *S : CS::body_range(CS.body_begin(), CS.body_end() - 1) {
-        if (!Finder.TraverseStmt(S)) {
-          // The finder found an invalid return statement
-          return;
-        }
-      }
-
-      // recurse to check the last statement in the compound statement
-      Stmt *LastStmt = CS.body_begin()[CS.size() - 1];
-      CheckParametricExpressionReturnStmt(LastStmt);
-      return;
-    }
-
-    case Stmt::IfStmtClass: {
-      //   - constexpr if/else statement
-      IfStmt* If = cast<IfStmt>(S);
-      if (If.isConstexpr()) {
-        // recurse into the statement of each branch of the constexpr if/else
-        CheckParametricExpressionReturnStmt(If.getThen());
-        CheckParametricExpressionReturnStmt(If.getElse());
-      }
-      else {
-        // the if statement must be constexpr
-        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-      }
-
-      return;
-
-    default:
-      // all other types of statements are not allowed
-      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-    }
-  }
 }
 
 Decl *Sema::ActOnNamespaceAliasDef(Scope *S, SourceLocation NamespaceLoc,

@@ -2554,6 +2554,11 @@ Decl *TemplateDeclInstantiator::VisitConstructorUsingShadowDecl(
   return nullptr;
 }
 
+Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(ParametricExpressionDecl *D) {
+  // TODO JASON
+  return D;
+}
+
 template <typename T>
 Decl *TemplateDeclInstantiator::instantiateUnresolvedUsingDecl(
     T *D, bool InstantiatingPackElement) {

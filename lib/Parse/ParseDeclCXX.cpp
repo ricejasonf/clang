@@ -868,13 +868,34 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   DeclSpec DS(AttrFactory);
   Declarator ParametricExpressionDeclarator(DS, DeclaratorContext::ParametricExpressionContext);
   ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier, D.Name.getBeginLoc());
+
+  // not sure if we want FunctionDeclarationScope here
+  ParseScope PrototypeScope(this,
+                            Scope::FunctionPrototypeScope |
+                            Scope::FunctionDeclarationScope |
+                            Scope::DeclScope);
+
+  BalancedDelimiterTracker T(*this, tok::l_paren);
+  T.consumeOpen();
+  SourceLocation LParenLoc = T.getOpenLocation();
+
+  // Parse parameter-declaration-clause.
   SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;
   ParsedAttributes attrs(AttrFactory);
   SourceLocation EllipsisLoc;
-  ParseParameterDeclarationClause(ParametricExpressionDeclarator,
-                                  attrs, ParamInfo, EllipsisLoc);
 
+  if (Tok.isNot(tok::r_paren)) {
+    ParseParameterDeclarationClause(ParametricExpressionDeclarator,
+                                    attrs, ParamInfo, EllipsisLoc);
+  }
+  T.consumeClose();
+
+  // TODO PushFunctionScope here is kind of a hack
+  Actions.PushFunctionScope();
+  ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
+                                 Scope::CompoundStmtScope);
   StmtResult CompoundStmtResult(ParseCompoundStatementBody());
+  BodyScope.Exit();
 
   DeclEnd = Tok.getLocation();
   return Actions.ActOnParametricExpressionDecl(getCurScope(), AS, UsingLoc,

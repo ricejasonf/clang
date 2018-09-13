@@ -3954,13 +3954,13 @@ class ParametricExpressionDecl : public NamedDecl {
   unsigned NumParams = 0;
 
 protected:
-  ParametricExpressionDecl(ASTContext &C, DeclContext *DC, DeclarationNameInfo* DN,
+  ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
                            CompoundStmt *B, SourceLocation StartL)
-    : NamedDecl(Label, DC, DN.getLoc(), DN.getInfo()), Body(B), LocStart(StartL) {}
+    : NamedDecl(Label, DC, DN.getLoc(), DN.getName()), Body(B), LocStart(StartL) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
-                                          DeclarationNameInfo* DN,
+                                          const DeclarationNameInfo &DN,
                                           CompoundStmt *B, SourceLocation StartL);
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
@@ -3969,11 +3969,11 @@ public:
 
 
   // ArrayRef interface to parameters.
-  ArrayRef<NamedDecl *> parameters() const {
-    return {Params, getNumParams()};
+  ArrayRef<ParmVarDecl *> parameters() const {
+    return {ParamInfo, getNumParams()};
   }
-  MutableArrayRef<NamedDecl *> parameters() {
-    return {Params, getNumParams()};
+  MutableArrayRef<ParmVarDecl *> parameters() {
+    return {ParamInfo, getNumParams()};
   }
 };
 

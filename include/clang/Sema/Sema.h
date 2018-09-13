@@ -4671,7 +4671,7 @@ public:
 
   Decl *ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                       SourceLocation UsingLoc,
-                                      const Declarator &ParametricExpressionDeclarator,
+                                      Declarator &ParametricExpressionDeclarator,
                                       MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                       StmtResult CompoundStmtResult);
 

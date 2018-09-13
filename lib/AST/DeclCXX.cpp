@@ -2913,12 +2913,12 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
   return DB << getAccessName(AS);
 }
 
-static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC, SourceLocation IdentL,
-                                        DeclarationName DN, CompoundStmt* B,
-                                        SourceLocation StartL) {
+ParametricExpressionDecl *ParametricExpressionDecl::Create(
+                            ASTContext &C, DeclContext *DC,
+                            const DeclarationNameInfo &DN,
+                            CompoundStmt* B, SourceLocation StartL) {
   ParametricExpressionDecl *New =
-      new (C, DC) ParametricExpressionDecl(C, DC, StartLoc, NameInfo, T, TInfo,
-                                           SC, isInlineSpecified, isConstexprSpecified);
+      new (C, DC) ParametricExpressionDecl(C, DC, DN, B, StartL);
   return New;
 }
 

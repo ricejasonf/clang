@@ -4675,7 +4675,7 @@ def err_redefinition_variably_modified_typedef : Error<
 
 def err_redefinition_of_parametric_expression : Error<
   "redefinition of parametric expression %0">;
-def err_parametric_expression_var_arg : Error<
+def err_parametric_expression_vararg : Error<
   "C style variadic function ellipsis not allowed in parametric expression declarator">;
 def err_parametric_expression_multiple_parameter_packs : Error<
   "Parametric expression parameter list may contain only one parameter pack">;
