@@ -894,10 +894,9 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                                  Scope::CompoundStmtScope);
-  StmtResult CompoundStmtResult(ParseCompoundStatementBody());
+  StmtResult CompoundStmtResult(ParseCompoundStatementBody(true));
   BodyScope.Exit();
 
-  DeclEnd = Tok.getLocation();
   return Actions.ActOnParametricExpressionDecl(getCurScope(), AS, UsingLoc,
                                                ParametricExpressionDeclarator,
                                                ParamInfo, CompoundStmtResult);

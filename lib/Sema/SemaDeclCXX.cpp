@@ -10533,81 +10533,6 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
-namespace {
-  /// AST visitor that finds invalid return statements
-  /// for parametric expressions where they are prohibited
-  class FindReturnStmt : public RecursiveASTVisitor<FindReturnStmt> {
-    Sema &SemaRef;
-
-  public:
-    explicit FindReturnStmt(Sema &S) : SemaRef(S) { }
-
-    bool VisitReturnStmt(ReturnStmt *E) {
-      SemaRef.Diag(E->getBeginLoc(), diag::err_parametric_expression_invalid_return_stmt);
-      return false;
-    }
-  };
-
-  void CheckParametricExpressionReturnStmt(Sema& SemaRef, Stmt *S) {
-    if (!S) {
-      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-      return;
-    }
-
-    switch(S->getStmtClass()) {
-    case Stmt::ReturnStmtClass:
-      //   - return-statement
-      return;
-
-    case Stmt::CompoundStmtClass: {
-      //   - compound-statement
-      CompoundStmt* CS = cast<CompoundStmt>(S);
-      if (CS->body_empty()) {
-        // empty body is invalid
-        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-        return;
-      }
-
-      // There should be no return statements except the last statement
-      FindReturnStmt Finder(SemaRef);
-      for (auto *S : CompoundStmt::body_range(CS->body_begin(), CS->body_end() - 1)) {
-        if (!Finder.TraverseStmt(S)) {
-          // The finder found an invalid return statement
-          return;
-        }
-      }
-
-      // recurse to check the last statement in the compound statement
-      Stmt *LastStmt = CS->body_begin()[CS->size() - 1];
-      CheckParametricExpressionReturnStmt(SemaRef, LastStmt);
-      return;
-    }
-
-    case Stmt::IfStmtClass: {
-      //   - constexpr if/else statement
-      IfStmt* If = cast<IfStmt>(S);
-      if (If->isConstexpr()) {
-        // recurse into the statement of each branch of the constexpr if/else
-        CheckParametricExpressionReturnStmt(SemaRef, If->getThen());
-        CheckParametricExpressionReturnStmt(SemaRef, If->getElse());
-      }
-      else {
-        // the if statement must be constexpr
-        SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-      }
-
-      return;
-    }
-
-    default:
-      // all other types of statements are not allowed
-      SemaRef.Diag(S->getBeginLoc(), diag::err_parametric_expression_invalid_last_stmt);
-
-      return;
-    }
-  }
-}
-
 Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                           SourceLocation UsingLoc,
                                           Declarator &ParametricExpressionDeclarator,
@@ -10616,8 +10541,25 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
   if (CompoundStmtResult.isInvalid())
     return nullptr;
 
-  CompoundStmt* CS = CompoundStmtResult.getAs<CompoundStmt>();
+  CompoundStmt *CS = CompoundStmtResult.getAs<CompoundStmt>();
   assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
+
+  // nullptr indicates an empty void expression
+  // If the body is empty it is just void.
+  // If the body is a single expression statement, use the expression.
+  // Otherwise, it becomes a statement expression.
+  Expr *E = nullptr;
+  if (!CS->body_empty()) {
+    Expr *SingleE = dyn_cast<Expr>(CS->body_back());
+    if (CS->size() == 1 && SingleE) {
+      E = SingleE;
+    } else {
+      ExprResult StmtExprResult = ActOnStmtExpr(CS->getLBracLoc(), CS, CS->getRBracLoc());
+      if (StmtExprResult.isInvalid())
+        return nullptr;
+      E = StmtExprResult.get();
+    }
+  }
 
   DeclarationNameInfo NameInfo = GetNameForDeclarator(
       ParametricExpressionDeclarator);
@@ -10673,12 +10615,10 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
       else {
         PackLocation = PD->getBeginLoc();
       }
-    } 
+    }
   }
 
-  CheckParametricExpressionReturnStmt(*this, CS);
-
-  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, NameInfo, CS, UsingLoc);
+  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, NameInfo, E, UsingLoc);
 
   if (ParamInfo.size() > 0) {
     SmallVector<ParmVarDecl*, 16> Params;

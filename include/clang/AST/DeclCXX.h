@@ -3948,20 +3948,20 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
 
 // ParametricExpressionDecl
 class ParametricExpressionDecl : public NamedDecl {
-  CompoundStmt* Body;
+  Expr* OutputExpr; // void if nullptr
   SourceLocation LocStart;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
 
 protected:
   ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
-                           CompoundStmt *B, SourceLocation StartL)
-    : NamedDecl(Label, DC, DN.getLoc(), DN.getName()), Body(B), LocStart(StartL) {}
+                           Expr *E, SourceLocation StartL)
+    : NamedDecl(ParametricExpression, DC, DN.getLoc(), DN.getName()), OutputExpr(E), LocStart(StartL) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           const DeclarationNameInfo &DN,
-                                          CompoundStmt *B, SourceLocation StartL);
+                                          Expr *E, SourceLocation StartL);
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
 

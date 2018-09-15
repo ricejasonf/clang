@@ -9452,9 +9452,4 @@ def err_std_compare_type_not_supported : Error<
    "member '%2' is missing|"
    "the type is not trivially copyable|"
    "the type does not have the expected form}1">;
-
-def err_parametric_expression_invalid_return_stmt : Error<
-  "parametric expression does not allow early return statement">;
-def err_parametric_expression_invalid_last_stmt : Error<
-  "parametric expression must end in a return statement">;
 } // end of sema component.

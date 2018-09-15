@@ -717,6 +717,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case ObjCMethod:
     case ObjCProperty:
     case MSProperty:
+    case ParametricExpression:
       return IDNS_Ordinary;
     case Label:
       return IDNS_Label;
