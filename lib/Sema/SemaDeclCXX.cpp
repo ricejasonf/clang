@@ -10589,22 +10589,10 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
   for (auto& P : ParamInfo) {
     assert(P.Param && "ParamInfo param decl must not be null");
 
-    // Checking for auto and no qualifiers could probably be done
-    // somewhere else where the DeclSpec is still available
     ParmVarDecl *PD = dyn_cast<ParmVarDecl>(P.Param);
     assert(PD && "ParamInfo::Param was not a ParmVarDecl");
 
-    AutoType* A = PD->getType()->getContainedAutoType();
-    if (!A) {
-      Diag(PD->getBeginLoc(), diag::err_parametric_expression_requires_constraint);
-      return nullptr;
-    }
-
-    if (PD->getType().hasLocalQualifiers()) {
-      Diag(PD->getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
-      return nullptr;
-    }
-
+    // FIXME: I doubt this check does anything
     if (PD->isParameterPack()) {
       if (PackLocation.isValid()) {
         Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);

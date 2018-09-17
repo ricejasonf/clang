@@ -2883,6 +2883,9 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
             T, QualType(CorrespondingTemplateParam->getTypeForDecl(), 0));
       }
       break;
+    case DeclaratorContext::ParametricExpressionContext:
+      // not sure anything is needed here
+      break;
     case DeclaratorContext::ParametricExpressionParameterContext:
       // Parametric Expression requires `auto` as a constraint
       if (!SemaRef.getLangOpts().CPlusPlus2a ||
@@ -3051,6 +3054,7 @@ static QualType GetDeclSpecTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::InitStmtContext:
     case DeclaratorContext::BlockLiteralContext:
     case DeclaratorContext::LambdaExprContext:
+    case DeclaratorContext::ParametricExpressionContext:
       // C++11 [dcl.type]p3:
       //   A type-specifier-seq shall not define a class or enumeration unless
       //   it appears in the type-id of an alias-declaration (7.1.3) that is not
@@ -4080,13 +4084,14 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::InitStmtContext:
     case DeclaratorContext::LambdaExprContext:
     case DeclaratorContext::LambdaExprParameterContext:
-    case DeclaratorContext::ParametricExpressionParameterContext:
     case DeclaratorContext::ObjCCatchContext:
     case DeclaratorContext::TemplateParamContext:
     case DeclaratorContext::TemplateArgContext:
     case DeclaratorContext::TemplateTypeArgContext:
     case DeclaratorContext::TypeNameContext:
     case DeclaratorContext::FunctionalCastContext:
+    case DeclaratorContext::ParametricExpressionContext:
+    case DeclaratorContext::ParametricExpressionParameterContext:
       // Don't infer in these contexts.
       break;
     }
@@ -4959,8 +4964,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     switch (D.getContext()) {
     case DeclaratorContext::PrototypeContext:
     case DeclaratorContext::LambdaExprParameterContext:
-      // TODO JASON - should ParametricExpressionParameterContext be here?
-
+    case DeclaratorContext::ParametricExpressionParameterContext: // JASON - I don't think this is right
       // C++0x [dcl.fct]p13:
       //   [...] When it is part of a parameter-declaration-clause, the
       //   parameter pack is a function parameter pack (14.5.3). The type T
@@ -5017,6 +5021,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     case DeclaratorContext::ObjCCatchContext:
     case DeclaratorContext::BlockLiteralContext:
     case DeclaratorContext::LambdaExprContext:
+    case DeclaratorContext::ParametricExpressionContext:
     case DeclaratorContext::ConversionIdContext:
     case DeclaratorContext::TrailingReturnContext:
     case DeclaratorContext::TrailingReturnVarContext:
@@ -5029,6 +5034,25 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       D.setEllipsisLoc(SourceLocation());
       break;
     }
+  }
+
+  // Validate parametric expression param
+  if (D.getContext() == DeclaratorContext::ParametricExpressionParameterContext) {
+    // This might not be the correct place to check these
+    if (T.hasLocalQualifiers() || T->isReferenceType() || T->isPointerType()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+
+    // "Apply constraint"
+    AutoType* A = T->getContainedAutoType();
+    if (!A) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_requires_constraint);
+      D.setInvalidType(true);
+    }
+
+    // Make the type "dependent"
+    T = S.Context.DependentTy;
   }
 
   assert(!T.isNull() && "T must not be null at the end of this function");
