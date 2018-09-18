@@ -831,9 +831,8 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
 Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
     SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
     AccessSpecifier AS, Decl **OwnedType) {
+  Scope* S = getCurScope();
   if (ExpectAndConsume(tok::l_paren)) {
-    // TODO there should not be semicolons so do we skip?
-    // SkipUntil(tok::semi);
     return nullptr;
   }
 
@@ -843,12 +842,11 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
     Diag(Tok.getLocation(), diag::warn_cxx2a_compat_parametric_expression_declaration);
   }
 
+  // TODO support operator overloads
   // Name must be an identifier.
   if (D.Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(D.Name.StartLocation, diag::err_alias_declaration_not_identifier);
     // No removal fixit: can't recover from this.
-    // TODO there should not be semicolons so do we skip?
-    // SkipUntil(tok::semi);
     return nullptr;
   } else if (D.TypenameLoc.isValid()) {
     Diag(D.TypenameLoc, diag::err_alias_declaration_not_identifier)
@@ -897,7 +895,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   StmtResult CompoundStmtResult(ParseCompoundStatementBody(true));
   BodyScope.Exit();
 
-  return Actions.ActOnParametricExpressionDecl(getCurScope(), AS, UsingLoc,
+  return Actions.ActOnParametricExpressionDecl(S, AS, UsingLoc,
                                                ParametricExpressionDeclarator,
                                                ParamInfo, CompoundStmtResult);
 }

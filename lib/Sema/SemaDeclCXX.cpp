@@ -10538,6 +10538,30 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                           Declarator &ParametricExpressionDeclarator,
                                           MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                           StmtResult CompoundStmtResult) {
+  DeclarationNameInfo NameInfo = GetNameForDeclarator(
+      ParametricExpressionDeclarator);
+  LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
+                        NotForRedeclaration);
+  LookupName(Previous, S);
+  FilterLookupForScope(Previous, CurContext, S, /*ConsiderLinkage*/false,
+                       /*AllowInlineNamespace*/false);
+
+  if (!Previous.empty()) {
+    NamedDecl *PreviousDecl = Previous.getRepresentativeDecl();
+    if (PreviousDecl->getKind() == Decl::ParametricExpression) {
+      Diag(UsingLoc, diag::err_redefinition_of_parametric_expression)
+        << NameInfo.getName();
+      notePreviousDefinition(PreviousDecl,
+                             ParametricExpressionDeclarator.getBeginLoc());
+    } else {
+      Diag(UsingLoc, diag::err_redefinition_different_kind)
+        << NameInfo.getName();
+      notePreviousDefinition(PreviousDecl,
+                             ParametricExpressionDeclarator.getBeginLoc());
+    }
+    return nullptr;
+  }
+
   if (CompoundStmtResult.isInvalid())
     return nullptr;
 
@@ -10559,22 +10583,6 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
         return nullptr;
       E = StmtExprResult.get();
     }
-  }
-
-  DeclarationNameInfo NameInfo = GetNameForDeclarator(
-      ParametricExpressionDeclarator);
-  LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
-                        ForVisibleRedeclaration);
-  LookupName(Previous, S);
-  FilterLookupForScope(Previous, CurContext, S, /*ConsiderLinkage*/false,
-                       /*AllowInlineNamespace*/false);
-
-  if (!Previous.empty()) {
-    Diag(UsingLoc, diag::err_redefinition_of_parametric_expression)
-      << NameInfo.getName();
-    notePreviousDefinition(Previous.getRepresentativeDecl(),
-                           ParametricExpressionDeclarator.getBeginLoc());
-    return nullptr;
   }
 
   // C style variadic function syntax is not allowed in parametric expression
@@ -10617,6 +10625,10 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     }
 
     New->setParams(Context, Params);
+  }
+
+  if (New) {
+    PushOnScopeChains(New, S);
   }
 
   return New;
