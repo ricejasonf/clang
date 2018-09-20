@@ -4791,6 +4791,30 @@ public:
   }
 };
 
+// ParametricExpressionIdExpr - A placeholder for the identifier when invoking
+//                              a ParametricExpression
+class ParametricExpressionIdExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParametricExpressionDecl *DefinitionDecl;
+
+public:
+  ParametricExpressionIdExpr(SourceLocation BL, ParametricExpressionDecl *D)
+    : Expr(ParametricExpressionIdExprClass, QualType(), VK_RValue, OK_Ordinary,
+           false, false, false, false),
+      BeginLoc(BL),
+      DefinitionDecl(D) {}
+
+  ParametricExpressionDecl *getDefinitionDecl() { return DefinitionDecl; }
+
+  // Iterators
+  child_range children() {
+    return child_range(child_iterator(), child_iterator());
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+};
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_EXPRCXX_H

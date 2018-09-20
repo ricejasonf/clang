@@ -875,7 +875,6 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
 
   BalancedDelimiterTracker T(*this, tok::l_paren);
   T.consumeOpen();
-  SourceLocation LParenLoc = T.getOpenLocation();
 
   // Parse parameter-declaration-clause.
   SmallVector<DeclaratorChunk::ParamInfo, 16> ParamInfo;

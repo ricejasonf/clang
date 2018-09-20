@@ -2118,6 +2118,11 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
   if (R.isAmbiguous())
     return ExprError();
 
+  if (HasTrailingLParen && R.getAsSingle<ParametricExpressionDecl>()) {
+    return new (Context) ParametricExpressionIdExpr(NameLoc,
+        R.getAsSingle<ParametricExpressionDecl>());
+  }
+
   // This could be an implicitly declared function reference (legal in C90,
   // extension in C99, forbidden in C++).
   if (R.empty() && HasTrailingLParen && II && !getLangOpts().CPlusPlus) {
@@ -5322,6 +5327,7 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
       return new (Context)
           CallExpr(Context, Fn, None, Context.VoidTy, VK_RValue, RParenLoc);
     }
+
     if (Fn->getType() == Context.PseudoObjectTy) {
       ExprResult result = CheckPlaceholderExpr(Fn);
       if (result.isInvalid()) return ExprError();
@@ -5356,6 +5362,10 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
     if (Fn->getType()->isRecordType())
       return BuildCallToObjectOfClassType(Scope, Fn, LParenLoc, ArgExprs,
                                           RParenLoc);
+
+    if (isa<ParametricExpressionIdExpr>(Fn)) {
+      return BuildParametricExpression(Scope, Fn, ArgExprs);
+    }
 
     if (Fn->getType() == Context.UnknownAnyTy) {
       ExprResult result = rebuildUnknownAnyFunction(*this, Fn);

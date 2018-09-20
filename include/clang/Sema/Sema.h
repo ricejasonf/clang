@@ -4675,6 +4675,8 @@ public:
                                       MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                       StmtResult CompoundStmtResult);
 
+  Expr *BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs);
+
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,
   /// including handling of its default argument expressions.

@@ -7904,3 +7904,7 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 
   return CheckMicrosoftIfExistsSymbol(S, SS, TargetNameInfo);
 }
+
+Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
+  assert(false && "ParametricExpression invocation is not yet implemented.");  
+}

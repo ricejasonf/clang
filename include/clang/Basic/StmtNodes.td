@@ -92,6 +92,7 @@ def ParenListExpr : DStmt<Expr>;
 def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
+def ParametricExpressionIdExpr : DStmt<Expr>;
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;
