@@ -695,6 +695,13 @@ void ASTStmtReader::VisitMemberExpr(MemberExpr *E) {
          "It's a subclass, we must advance Idx!");
 }
 
+void ASTStmtReader::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *E) {
+  // TODO JASON
+  // TODO set BeginLoc
+  // TODO set DefinitionDecl (how do we get that?)
+  // TODO add friend class ASTStmtReader
+}
+
 void ASTStmtReader::VisitObjCIsaExpr(ObjCIsaExpr *E) {
   VisitExpr(E);
   E->setBase(Record.readSubExpr());

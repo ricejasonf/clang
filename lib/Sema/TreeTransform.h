@@ -12782,6 +12782,14 @@ TreeTransform<Derived>::TransformCapturedStmt(CapturedStmt *S) {
   return getSema().ActOnCapturedRegionEnd(Body.get());
 }
 
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformParametricExpressionIdExpr(
+    ParametricExpressionIdExpr *E) {
+  // Would we transform the decl that this points to here?
+  return E;
+}
+
 } // end namespace clang
 
 #endif // LLVM_CLANG_LIB_SEMA_TREETRANSFORM_H

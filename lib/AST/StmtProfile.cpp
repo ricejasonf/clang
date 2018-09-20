@@ -1990,6 +1990,10 @@ void StmtProfiler::VisitTemplateArgument(const TemplateArgument &Arg) {
   }
 }
 
+void StmtProfiler::VisitParametricExpressionIdExpr(const ParametricExpressionIdExpr *S) {
+  VisitExpr(S);
+}
+
 void Stmt::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context,
                    bool Canonical) const {
   StmtProfilerWithPointers Profiler(ID, Context, Canonical);

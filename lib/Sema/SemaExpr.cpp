@@ -5358,14 +5358,14 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
       }
     }
 
+    if (isa<ParametricExpressionIdExpr>(Fn)) {
+      return BuildParametricExpression(Scope, Fn, ArgExprs);
+    }
+
     // Determine whether this is a call to an object (C++ [over.call.object]).
     if (Fn->getType()->isRecordType())
       return BuildCallToObjectOfClassType(Scope, Fn, LParenLoc, ArgExprs,
                                           RParenLoc);
-
-    if (isa<ParametricExpressionIdExpr>(Fn)) {
-      return BuildParametricExpression(Scope, Fn, ArgExprs);
-    }
 
     if (Fn->getType() == Context.UnknownAnyTy) {
       ExprResult result = rebuildUnknownAnyFunction(*this, Fn);

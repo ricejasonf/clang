@@ -1717,6 +1717,12 @@ void ASTStmtWriter::VisitTypoExpr(TypoExpr *E) {
   llvm_unreachable("Cannot write TypoExpr nodes");
 }
 
+void ASTStmtWriter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *E) {
+  // TODO JASON no idea if this is enough
+  VisitExpr(E);
+  Record.AddSourceLocation(E->getBeginLoc());
+}
+
 //===----------------------------------------------------------------------===//
 // CUDA Expressions and Statements.
 //===----------------------------------------------------------------------===//
