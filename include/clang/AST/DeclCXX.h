@@ -3948,7 +3948,7 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
 
 // ParametricExpressionDecl
 class ParametricExpressionDecl : public NamedDecl {
-  Expr* OutputExpr; // void if nullptr
+  Expr* OutputExpr;
   SourceLocation LocStart;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
@@ -3962,6 +3962,11 @@ public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           const DeclarationNameInfo &DN,
                                           Expr *E, SourceLocation StartL);
+
+  Expr *getOutputExpr() {
+    // void if nullptr
+    return OutputExpr;
+  }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
 

@@ -7906,5 +7906,34 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 }
 
 Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
-  assert(false && "ParametricExpression invocation is not yet implemented.");  
+  assert(isa<ParametricExpressionIdExpr>(Fn) &&
+      "Expecting only ParametricExpressionIdExpr right now");
+  ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
+
+  // TODO JASON pretty sure we aren't checking arity anywhere yet
+  // not sure how param packs work either
+  assert(ArgExprs.size() == D.getNumParams() && "Parameter and arg count must be equal");
+
+  Expr *OE = D->getOutputExpr();
+  if (!OE) {
+    // TODO JASON return void expression... somehow
+    assert(OE && "Empty parametric expression support not implemented yet")
+  }
+
+  // iterate args
+  for (unsigned I = 0; I < ArgExprs.size(); ++I) {
+    // create new vardecl that references the expr
+    // (via setInit)
+
+    // TODO exclude "using" params here
+  }
+
+  // Recreate the WHOLE OutputExpr
+  // Find all the DeclRefs and replace their VarDecls
+  // with the new shiny VarDecl
+  // For "using" params supposedly we can just
+  // substitute the DeclRefExprs with the ArgExpr
+  //
+  // This could possibly be done with TreeTransform
+  // if I understand it correctly
 }
