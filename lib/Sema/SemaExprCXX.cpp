@@ -7905,27 +7905,70 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
   return CheckMicrosoftIfExistsSymbol(S, SS, TargetNameInfo);
 }
 
+namespace {
+class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
+  using Base = TreeTransform<ParametricExpressionRebuilder>;
+  using ParmTarget = llvm::PointerUnion4<ParmVarDecl, Expr, ArrayRef<ParmVarDecl*>, ArrayRef<Expr*>
+  using ParamMap = llvm::SmallDensMap<ParmVarDecl*, ParmVarDecl*>;
+  MultiExprArg ArgExprs;
+  ParamMap OldParams;
+
+public:
+  ParametricExpressionRebuilder(Sema &SemaRef, ParamMap& P,
+                                MultiExprArg A) {
+      : Base(SemaRef)
+      , ArgExprs(A)
+      , OldParams(P) {}
+
+  ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
+    Decl* OP = E->getDecl();
+    if (OldParams.find(OP) != OldParams.end()) {
+      //
+      //
+      // TODO handle pack expansion expression
+      //      by returning FunctionParmPackExpr I think
+    }
+  }
+};
+}
+
 Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
 
   // TODO JASON pretty sure we aren't checking arity anywhere yet
-  // not sure how param packs work either
+  // not sure how param packs will work either
   assert(ArgExprs.size() == D.getNumParams() && "Parameter and arg count must be equal");
 
   Expr *OE = D->getOutputExpr();
   if (!OE) {
     // TODO JASON return void expression... somehow
-    assert(OE && "Empty parametric expression support not implemented yet")
+    assert(OE && "Empty parametric expression support not implemented yet");
   }
 
-  // iterate args
-  for (unsigned I = 0; I < ArgExprs.size(); ++I) {
-    // create new vardecl that references the expr
-    // (via setInit)
+  // create ParmVarDecl for each ArgExpr
+  // note the length of the param pack (if any)
+  //
+  // map each ArgExpr to an original ParmVarDecl
 
-    // TODO exclude "using" params here
+  llvm::SmallDenseSet<ParmVarDecl *> OldParams{};
+  // iterate args
+  for (auto P : D->parameters()) {
+    // map P to pair<NewParmVarDecl*, ArrayRef<Expr*>>
+    //               ^                ^ length of one unless param pack
+    //               ^-- null if `using` param
+
+    // map to new param
+    //
+    // case: normal param
+    //
+    // case: param pack to array of params
+    //
+    // case: using param to expr
+    //
+    // case: using param pack to array of exprs
+    OldParams[P] = nullptr;
   }
 
   // Recreate the WHOLE OutputExpr
