@@ -3947,7 +3947,7 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
                                     AccessSpecifier AS);
 
 // ParametricExpressionDecl
-class ParametricExpressionDecl : public NamedDecl {
+class ParametricExpressionDecl : public FunctionDecl {
   Expr* OutputExpr;
   SourceLocation LocStart;
   ParmVarDecl **ParamInfo = nullptr;
@@ -3955,13 +3955,22 @@ class ParametricExpressionDecl : public NamedDecl {
 
 protected:
   ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
-                           Expr *E, SourceLocation StartL)
-    : NamedDecl(ParametricExpression, DC, DN.getLoc(), DN.getName()), OutputExpr(E), LocStart(StartL) {}
+                           Expr *E, SourceLocation StartL, TypeSourceInfo* TInfo)
+    : FunctionDecl(ParametricExpression, C, DC, StartL, DN, C.DependentTy, TInfo,
+                   SC_None, false, false) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           const DeclarationNameInfo &DN,
-                                          Expr *E, SourceLocation StartL);
+                                          Expr *E, SourceLocation StartL,
+                                          TypeSourceInfo* TInfo);
+  bool hasLinkage() {
+    return false;
+  }
+
+  // Implement isa/cast/dyncast/etc.
+  static bool classof(const Decl *D) { return classofKind(D->getKind()); }
+  static bool classofKind(Kind K) { return K == ParametricExpression; }
 
   Expr *getOutputExpr() {
     // void if nullptr

@@ -7905,6 +7905,7 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
   return CheckMicrosoftIfExistsSymbol(S, SS, TargetNameInfo);
 }
 
+#if 0
 namespace {
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
   using Base = TreeTransform<ParametricExpressionRebuilder>;
@@ -7931,8 +7932,11 @@ public:
   }
 };
 }
+#endif
 
 Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
+  assert(false && "BuildParametricExpression not implemented yet");
+#if 0
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
@@ -7979,4 +7983,5 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
   //
   // This could possibly be done with TreeTransform
   // if I understand it correctly
+#endif
 }

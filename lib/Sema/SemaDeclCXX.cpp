@@ -10614,7 +10614,12 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     }
   }
 
-  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, NameInfo, E, UsingLoc);
+  // TInfo is just a dummy since parametric expression
+  // declarators do not actually name a type
+  TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
+  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, 
+                                                                   NameInfo, E, UsingLoc,
+                                                                   TInfo);
 
   if (ParamInfo.size() > 0) {
     SmallVector<ParmVarDecl*, 16> Params;
