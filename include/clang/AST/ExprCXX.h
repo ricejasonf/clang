@@ -4813,6 +4813,10 @@ public:
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
   SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ParametricExpressionIdExprClass;
+  }
 };
 
 } // namespace clang
