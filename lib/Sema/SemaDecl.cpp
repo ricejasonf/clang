@@ -12353,6 +12353,13 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
       CheckParameter(Context.getTranslationUnitDecl(), D.getBeginLoc(),
                      D.getIdentifierLoc(), II, parmDeclType, TInfo, SC);
 
+  if (DS.isUsingSpecified()) {
+    assert(D.getContext() ==
+        DeclaratorContext::ParametricExpressionParameterContext
+      && "`using` param only allowed in parametric-expression");
+    New->setUsingSpecified(true);
+  }
+
   if (D.isInvalidType())
     New->setInvalidDecl();
 
