@@ -768,6 +768,8 @@ def err_alias_declaration_specialization : Error<
   "%select{partial specialization|explicit specialization|explicit instantiation}0 of alias templates is not permitted">;
 def err_alias_declaration_pack_expansion : Error<
   "alias declaration cannot be a pack expansion">;
+def err_unexpected_using_specifier : Error<
+  "using specifier only allowed for parametric expression parameters">;
 
 // C++17 using-declaration pack expansions
 def ext_multi_using_declaration : ExtWarn<

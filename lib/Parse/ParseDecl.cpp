@@ -3508,6 +3508,18 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       isInvalid = DS.SetConstexprSpec(Loc, PrevSpec, DiagID);
       break;
 
+    // using specifier for parametric expression param
+    case tok::kw_using:
+      if (DSContext == DeclSpecContext::DSC_param_var) {
+        isInvalid = DS.SetUsingSpec(Loc, PrevSpec, DiagID);
+      } else {
+        PrevSpec = ""; // not actually used by the diagnostic
+        // uhh what is the error for this
+        DiagID = diag::err_unexpected_using_specifier;
+        isInvalid = true;
+      }
+      break;
+
     // type-specifier
     case tok::kw_short:
       isInvalid = DS.SetTypeSpecWidth(DeclSpec::TSW_short, Loc, PrevSpec,
@@ -4907,6 +4919,9 @@ bool Parser::isDeclarationSpecifier(bool DisambiguatingWithExpression) {
     // C++11 decltype and constexpr.
   case tok::annot_decltype:
   case tok::kw_constexpr:
+
+  // using specifier for parametric expression param
+  case tok::kw_using:
 
     // C11 _Atomic
   case tok::kw__Atomic:
@@ -6389,7 +6404,8 @@ void Parser::ParseParameterDeclarationClause(
     // too much hassle.
     DS.takeAttributesFrom(FirstArgAttrs);
 
-    ParseDeclarationSpecifiers(DS);
+    ParseDeclarationSpecifiers(DS, ParsedTemplateInfo(),
+                               AS_none, DeclSpecContext::DSC_param_var);
 
     // Parse the declarator.  This is "PrototypeContext", 
     // "LambdaExprParameterContext", or "ParametricExpressionContext"

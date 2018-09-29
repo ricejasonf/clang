@@ -989,6 +989,20 @@ bool DeclSpec::SetConstexprSpec(SourceLocation Loc, const char *&PrevSpec,
   return false;
 }
 
+bool DeclSpec::SetUsingSpec(SourceLocation Loc, const char *&PrevSpec,
+                            unsigned &DiagID) {
+  // 'using using' is ok, but warn as this is likely not what the user
+  // intended.
+  if (Using_specified) {
+    DiagID = diag::warn_duplicate_declspec;
+    PrevSpec = "using";
+    return true;
+  }
+  Using_specified = true;
+  UsingLoc = Loc;
+  return false;
+}
+
 void DeclSpec::SaveWrittenBuiltinSpecs() {
   writtenBS.Sign = getTypeSpecSign();
   writtenBS.Width = getTypeSpecWidth();

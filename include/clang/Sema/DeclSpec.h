@@ -366,6 +366,9 @@ private:
   // constexpr-specifier
   unsigned Constexpr_specified : 1;
 
+  // using-specifier (for parametric expression param)
+  unsigned Using_specified : 1;
+
   union {
     UnionParsedType TypeRep;
     Decl *DeclRep;
@@ -395,7 +398,7 @@ private:
       TQ_unalignedLoc;
   SourceLocation FS_inlineLoc, FS_virtualLoc, FS_explicitLoc, FS_noreturnLoc;
   SourceLocation FS_forceinlineLoc;
-  SourceLocation FriendLoc, ModulePrivateLoc, ConstexprLoc;
+  SourceLocation FriendLoc, ModulePrivateLoc, ConstexprLoc, UsingLoc;
   SourceLocation TQ_pipeLoc;
 
   WrittenBuiltinSpecs writtenBS;
@@ -442,6 +445,7 @@ public:
       FS_noreturn_specified(false),
       Friend_specified(false),
       Constexpr_specified(false),
+      Using_specified(false),
       Attrs(attrFactory),
       writtenBS(),
       ObjCQualifiers(nullptr) {
@@ -712,6 +716,9 @@ public:
   bool SetConstexprSpec(SourceLocation Loc, const char *&PrevSpec,
                         unsigned &DiagID);
 
+  bool SetUsingSpec(SourceLocation Loc, const char *&PrevSpec,
+                    unsigned &DiagID);
+
   bool isFriendSpecified() const { return Friend_specified; }
   SourceLocation getFriendSpecLoc() const { return FriendLoc; }
 
@@ -720,6 +727,9 @@ public:
 
   bool isConstexprSpecified() const { return Constexpr_specified; }
   SourceLocation getConstexprSpecLoc() const { return ConstexprLoc; }
+
+  bool isUsingSpecified() const { return Using_specified; }
+  SourceLocation getUsingSpecLoc() const { return UsingLoc; }
 
   void ClearConstexprSpec() {
     Constexpr_specified = false;
