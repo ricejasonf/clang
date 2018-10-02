@@ -10562,29 +10562,6 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     return nullptr;
   }
 
-  if (CompoundStmtResult.isInvalid())
-    return nullptr;
-
-  CompoundStmt *CS = CompoundStmtResult.getAs<CompoundStmt>();
-  assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
-
-  // nullptr indicates an empty void expression
-  // If the body is empty it is just void.
-  // If the body is a single expression statement, use the expression.
-  // Otherwise, it becomes a statement expression.
-  Expr *E = nullptr;
-  if (!CS->body_empty()) {
-    Expr *SingleE = dyn_cast<Expr>(CS->body_back());
-    if (CS->size() == 1 && SingleE) {
-      E = SingleE;
-    } else {
-      ExprResult StmtExprResult = ActOnStmtExpr(CS->getLBracLoc(), CS, CS->getRBracLoc());
-      if (StmtExprResult.isInvalid())
-        return nullptr;
-      E = StmtExprResult.get();
-    }
-  }
-
   // C style variadic function syntax is not allowed in parametric expression
   // parameter list
   if (ParametricExpressionDeclarator.hasEllipsis()) {
@@ -10593,12 +10570,17 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     return nullptr;
   }
 
+  bool NeedsRAII = false;
   SourceLocation PackLocation{};
   for (auto& P : ParamInfo) {
     assert(P.Param && "ParamInfo param decl must not be null");
 
     ParmVarDecl *PD = dyn_cast<ParmVarDecl>(P.Param);
     assert(PD && "ParamInfo::Param was not a ParmVarDecl");
+
+    if (!PD->isUsingSpecified()) {
+      NeedsRAII = true;
+    }
 
     // FIXME: I doubt this check does anything
     if (PD->isParameterPack()) {
@@ -10614,11 +10596,36 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     }
   }
 
+  if (CompoundStmtResult.isInvalid())
+    return nullptr;
+
+  CompoundStmt *CS = CompoundStmtResult.getAs<CompoundStmt>();
+  assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
+
+  // nullptr indicates an empty void expression
+  // If the body is empty it is just void.
+  // If the body is a single return statement, use the expression.
+  // Otherwise, just keep the compound-statement.
+  Stmt *Body = nullptr;
+  if (NeedsRAII) {
+    Body = CS;
+  } else if (!CS->body_empty()) {
+    ReturnStmt *SingleReturn = dyn_cast<ReturnStmt>(CS->body_back());
+    if (CS->size() == 1 && SingleReturn) {
+      Body = SingleReturn->getRetValue();
+    } else {
+      Body = CS;
+    }
+  } else {
+    // Doesn't need RAII and the body is empty
+    // TODO Consider setting the Body to an expression yielding void here
+  }
+
   // TInfo is just a dummy since parametric expression
   // declarators do not actually name a type
   TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
   ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, 
-                                                                   NameInfo, E, UsingLoc,
+                                                                   NameInfo, Body, UsingLoc,
                                                                    TInfo);
 
   if (ParamInfo.size() > 0) {
