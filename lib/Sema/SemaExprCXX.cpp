@@ -7905,11 +7905,10 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
   return CheckMicrosoftIfExistsSymbol(S, SS, TargetNameInfo);
 }
 
-#if 0
 namespace {
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
   using Base = TreeTransform<ParametricExpressionRebuilder>;
-  using ParmTarget = llvm::PointerUnion4<ParmVarDecl, Expr, ArrayRef<ParmVarDecl*>, ArrayRef<Expr*>
+  using ParmTarget = llvm::PointerUnion<ParmVarDecl*, Expr*, ArrayRef<ParmVarDecl*>, ArrayRef<Expr*>
   using ParamMap = llvm::SmallDensMap<ParmVarDecl*, ParmVarDecl*>;
   MultiExprArg ArgExprs;
   ParamMap OldParams;
@@ -7932,11 +7931,9 @@ public:
   }
 };
 }
-#endif
 
 Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
   assert(false && "BuildParametricExpression not implemented yet");
-#if 0
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
@@ -7945,10 +7942,11 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
   // not sure how param packs will work either
   assert(ArgExprs.size() == D.getNumParams() && "Parameter and arg count must be equal");
 
-  Expr *OE = D->getOutputExpr();
-  if (!OE) {
-    // TODO JASON return void expression... somehow
-    assert(OE && "Empty parametric expression support not implemented yet");
+  Stmt *Output = D->getOutput();
+  assert(Output && "ParametricExpressionDecl Output is nullptr");
+  if (CompoundStmt::classof(Output)) {
+    // Create a ParametricExpressionExpr which requires code gen and stuff   
+    // Output = ParametricExpressionExpr::Create(...);
   }
 
   // create ParmVarDecl for each ArgExpr
@@ -7956,7 +7954,7 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
   //
   // map each ArgExpr to an original ParmVarDecl
 
-  llvm::SmallDenseSet<ParmVarDecl *> OldParams{};
+  llvm::SmallDenseMap<ParmVarDecl*, ParmVarDecl*> ParamMap{};
   // iterate args
   for (auto P : D->parameters()) {
     // map P to pair<NewParmVarDecl*, ArrayRef<Expr*>>
@@ -7972,7 +7970,11 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
     // case: using param to expr
     //
     // case: using param pack to array of exprs
-    OldParams[P] = nullptr;
+    auto New = new (Context) ParmVarDecl(P);
+    // TODO we could create a VariadicParmVarDecl
+    // to setInit with Array<Expr*> since we want
+    // to substitute before pack expansions
+    ParamMap[P] = New;
   }
 
   // Recreate the WHOLE OutputExpr
@@ -7983,5 +7985,4 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
   //
   // This could possibly be done with TreeTransform
   // if I understand it correctly
-#endif
 }

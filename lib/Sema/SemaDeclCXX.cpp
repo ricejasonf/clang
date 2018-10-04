@@ -10618,7 +10618,8 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     }
   } else {
     // Doesn't need RAII and the body is empty
-    // TODO Consider setting the Body to an expression yielding void here
+    // TODO Create an Expr that return void (somehow)
+    assert(false && "Empty parametric expression definition not supported yet.");
   }
 
   // TInfo is just a dummy since parametric expression

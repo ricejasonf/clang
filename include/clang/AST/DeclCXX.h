@@ -3948,16 +3948,16 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
 
 // ParametricExpressionDecl
 class ParametricExpressionDecl : public FunctionDecl {
-  Stmt* Body;
-  SourceLocation LocStart;
+  Stmt* Output;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
 
 protected:
   ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
-                           Stmt *B, SourceLocation StartL, TypeSourceInfo* TInfo)
+                           Stmt *O, SourceLocation StartL, TypeSourceInfo* TInfo)
     : FunctionDecl(ParametricExpression, C, DC, StartL, DN, C.DependentTy, TInfo,
-                   SC_None, false, false) {}
+                   SC_None, false, false),
+      Output(O) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
@@ -3972,9 +3972,9 @@ public:
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
   static bool classofKind(Kind K) { return K == ParametricExpression; }
 
-  Stmt *getBody() {
+  Stmt *getOutput() {
     // nullptr, Expr, or CompoundStmt
-    return Body;
+    return Output;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
