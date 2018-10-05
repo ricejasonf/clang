@@ -7906,6 +7906,23 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 }
 
 namespace {
+
+ParmVarDecl* CreateParametricExpressionParmVar(Sema& SemaRef, ParmVarDecl* Old,
+                                               ArrayRef<Expr*>::iterator ArgsExprItr,
+                                               ArrayRef<Expr*>::iterator ArgExprEnd) {
+  assert(ArgsExprItr != ArgsExprEnd && "ArgsExprItr out of range");
+  NewDI =  
+  ParmVarDecl *New = ParmVarDecl::Create(SemaRef.Context,
+                                         Old->getDeclContext(),
+                                         Old->getInnerLocStart(),
+                                         Old->getLocation(),
+                                         Old->getIdentifier(),
+                                         NewDI->getType(),
+                                         NewDI,
+                                         OldParm->getStorageClass(),
+                                         /* DefArg */ nullptr);
+}
+
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
   using Base = TreeTransform<ParametricExpressionRebuilder>;
   using ParmTarget = llvm::PointerUnion<ParmVarDecl*, Expr*, ArrayRef<ParmVarDecl*>, ArrayRef<Expr*>
@@ -7938,43 +7955,84 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
 
-  // TODO JASON pretty sure we aren't checking arity anywhere yet
-  // not sure how param packs will work either
-  assert(ArgExprs.size() == D.getNumParams() && "Parameter and arg count must be equal");
+  // We already know there is at most one param pack
+  int PackSize = ArgExprs.size() - D->getNumParams() + 1;
+  int PackCount = (std::find_if(D->parameters().begin(),
+                                D->parameters().end(),
+                                [](ParmVarDecl* PD) {
+                                  return PD->isParameterPack(); })
+                  != D->parameters().end()) ? 1 : 0;
+
+  // If PackSize is negative then there must not be a param pack
+  // Or the user gave us an invalid arity
+  if ((PackCount == 1 && PackSize < 0) || (ArgsExprs.size() != D->getNumParams())) {
+    Diag(Tok.getLocation(), diag::err_parametric_expression_arg_list_different_arity)
+      << ((PackCount == 1) || ArgsExprs.size() > D->getNumParams()) ? 1 : 0;
+  }
 
   Stmt *Output = D->getOutput();
   assert(Output && "ParametricExpressionDecl Output is nullptr");
+
   if (CompoundStmt::classof(Output)) {
     // Create a ParametricExpressionExpr which requires code gen and stuff   
     // Output = ParametricExpressionExpr::Create(...);
   }
 
   // create ParmVarDecl for each ArgExpr
+  // where ParmVarDecl is not UsingSpecified
+  //
+  // For packs map it to a FunctionParamPackExpr or a UsingParamPackExpr
   // note the length of the param pack (if any)
   //
   // map each ArgExpr to an original ParmVarDecl
 
-  llvm::SmallDenseMap<ParmVarDecl*, ParmVarDecl*> ParamMap{};
+  llvm::SmallVectorImpl<ParmVarDecl*> NewParmVarDecls{};
+  llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap{};
+  auto ArgExprItr = ArgExprs.begin();
+
   // iterate args
   for (auto P : D->parameters()) {
-    // map P to pair<NewParmVarDecl*, ArrayRef<Expr*>>
-    //               ^                ^ length of one unless param pack
-    //               ^-- null if `using` param
+    // create a ParmVarDecl for every non-using ParmVarDecl
+    // map Old to index of new
 
-    // map to new param
-    //
-    // case: normal param
-    //
-    // case: param pack to array of params
-    //
-    // case: using param to expr
-    //
-    // case: using param pack to array of exprs
+    auto CurrentArgExpr = *ArgExprItr;
+    if (P.isParameterPack()) {
+      ArgExprItr += PackSize;
+    } else {
+      ++ArgExprItr
+    }
+
+    if (P->isUsingSpecified()) {
+      
+      continue;
+    }
+
+    // Old Param maps to index of New Param in NewParmVarDecls
+    // This allows us to map packs to mutliple vars when we transform
+    ParamMap[P] = NewParmVarDecls.size();
+
+    if (P->isParameterPack()) {
+      // insert PackSize ParmVarDecls
+      for (int i = 0; i < PackSize; i++) {
+  ParmVarDecl *newParm = ParmVarDecl::Create(SemaRef.Context,
+                                             OldParm->getDeclContext(),
+                                             OldParm->getInnerLocStart(),
+                                             OldParm->getLocation(),
+                                             OldParm->getIdentifier(),
+                                             NewDI->getType(),
+                                             NewDI,
+                                             OldParm->getStorageClass(),
+                                             /* DefArg */ nullptr);
+        NewParmVarDecls.push_back(
+        CurrentArgExprIndex++;
+      }
+    } else {
+      // insert single ParmVarDecl
+
+      CurrentArgExprIndex++;
+    }
+
     auto New = new (Context) ParmVarDecl(P);
-    // TODO we could create a VariadicParmVarDecl
-    // to setInit with Array<Expr*> since we want
-    // to substitute before pack expansions
-    ParamMap[P] = New;
   }
 
   // Recreate the WHOLE OutputExpr

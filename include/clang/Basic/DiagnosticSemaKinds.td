@@ -4683,6 +4683,8 @@ def err_parametric_expression_requires_constraint : Error<
   "Parametric expression parameter specifier must be constraint that is auto">;
 def err_parametric_expression_constraint_has_qualifiers : Error<
   "Parametric expression parameter constraint must not have qualifiers">;
+def err_parametric_expression_arg_list_different_arity : Error<
+  "%select{too few|too many}0 arguments for parametric expression">;
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;
