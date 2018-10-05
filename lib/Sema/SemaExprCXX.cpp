@@ -7911,7 +7911,7 @@ ParmVarDecl* CreateParametricExpressionParmVar(Sema& SemaRef, ParmVarDecl* Old,
                                                ArrayRef<Expr*>::iterator ArgsExprItr,
                                                ArrayRef<Expr*>::iterator ArgExprEnd) {
   assert(ArgsExprItr != ArgsExprEnd && "ArgsExprItr out of range");
-  NewDI =  
+  TypeSourceInfo *NewDI = SemaRef.getTypeSourceInfo(
   ParmVarDecl *New = ParmVarDecl::Create(SemaRef.Context,
                                          Old->getDeclContext(),
                                          Old->getInnerLocStart(),
