@@ -7906,7 +7906,6 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 }
 
 namespace {
-
 ParmVarDecl* CreateParametricExpressionParmVar(Sema& SemaRef, ParmVarDecl* Old, Expr *E) {
   TypeSourceInfo *NewDI = SemaRef.getTypeSourceInfo(SemaRef.Context,
       SemaRef.Context.getRValueReference(E->getType()));
@@ -7924,31 +7923,57 @@ ParmVarDecl* CreateParametricExpressionParmVar(Sema& SemaRef, ParmVarDecl* Old, 
 
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
   using Base = TreeTransform<ParametricExpressionRebuilder>;
-  using ParmTarget = llvm::PointerUnion<ParmVarDecl*, Expr*, ArrayRef<ParmVarDecl*>, ArrayRef<Expr*>
-  using ParamMap = llvm::SmallDensMap<ParmVarDecl*, ParmVarDecl*>;
+  using ParamVec = llvm::SmallVectorImpl<ParmVarDecl*>;
+  using ParamMap = llvm::SmallDenseMap<ParmVarDecl*, unsigned>;
+  // ParamMap maps to index of ParmVec or MultiExprArg
+
+  Sema &SemaRef;
+  ParamMap& PMap;
+  ParamVec& PVec;
   MultiExprArg ArgExprs;
-  ParamMap OldParams;
 
 public:
-  ParametricExpressionRebuilder(Sema &SemaRef, ParamMap& P,
-                                MultiExprArg A) {
-      : Base(SemaRef)
-      , ArgExprs(A)
-      , OldParams(P) {}
+  ParametricExpressionRebuilder(Sema &SemaRef, ParamMap& PM,
+                                ParamVec& PV, MultiExprArg A)
+    : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
 
   ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
-    Decl* OP = E->getDecl();
-    if (OldParams.find(OP) != OldParams.end()) {
-      //
-      //
-      // TODO handle pack expansion expression
-      //      by returning FunctionParmPackExpr I think
+    auto PMapItr = PMap.find(E->getDecl());
+    if (PMapItr != PMap.end()) {
+      ParmVarDecl* OP = PMapItr->first;
+      if (OP->isParameterPack()) {
+        int PackSize = ArgExprs.size() - PMap.size() + 1;
+
+        if (OP->isUsingSpecified()) {
+          assert(false && "TODO Implement UsingParmPackExpr");
+          /*
+          return UsingParmPackExpr::Create(getSema().Context, E->getType(),
+                                           OP, E->getExprLoc()
+                                           ArrayRef(ArgExprs[PMapItr->second], PackSize));
+          */
+        } else {
+          return FunctionParmPackExpr::Create(getSema().Context, E->getType(),
+                                              OP, E->getExprLoc()
+                                              ArrayRef(PVec[PMapItr->second], PackSize));
+        }
+      } else {
+        if (OP->isUsingSpecified()) {
+          // Substitute the DeclRef with the Expr
+          return ArgExprs[PMapItr->second];
+        } else {
+          // rebuild declref to point to the mapped ParmVarDecl
+          return getDerived().RebuildDeclRefExpr(E->getQualifierLoc(),
+                                                 PVec[PMapItr->second],
+                                                 E->getNameInfo(), 
+                                                 /* TemplateArgs */ nullptr);
+        }
+      }
     }
   }
 };
 }
 
-Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
+ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
   assert(false && "BuildParametricExpression not implemented yet");
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
@@ -7964,63 +7989,54 @@ Expr *Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs)
 
   // If PackSize is negative then there must not be a param pack
   // Or the user gave us an invalid arity
-  if ((PackCount == 1 && PackSize < 0) || (ArgsExprs.size() != D->getNumParams())) {
+  if ((PackCount == 1 && PackSize < 0) || (ArgExprs.size() != D->getNumParams())) {
     Diag(Tok.getLocation(), diag::err_parametric_expression_arg_list_different_arity)
-      << ((PackCount == 1) || ArgsExprs.size() > D->getNumParams()) ? 1 : 0;
+      << ((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0;
   }
 
   Stmt *Output = D->getOutput();
   assert(Output && "ParametricExpressionDecl Output is nullptr");
 
-  if (CompoundStmt::classof(Output)) {
-    // TODO
-    // Create a ParametricExpressionExpr which requires code gen and stuff   
-    // Output = ParametricExpressionExpr::Create(...);
-  }
-
-  // create ParmVarDecl for each ArgExpr
-  // where ParmVarDecl is not UsingSpecified
-  //
-  // For packs map it to a FunctionParamPackExpr or a UsingParamPackExpr
-  // note the length of the param pack (if any)
-  //
-  // map each ArgExpr to an original ParmVarDecl
-
+  auto ArgExprsItr = ArgExprs.begin();
   llvm::SmallVectorImpl<ParmVarDecl*> NewParmVarDecls{};
   llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap{};
-  auto ArgsExprItr = ArgExprs.begin();
+  ParamMap.init(D->getNumParams());
 
-  // iterate args
+  // iterate declared params
   for (auto P : D->parameters()) {
-    // create a ParmVarDecl for every non-using ParmVarDecl
-    // map Old to index of new
-
     int Count = P->isParameterPack() ? PackSize : 1;
     if (P->isUsingSpecified()) {
-      // These will be substituted with
-      // the expr in the transform 
-      ArgsExprItr += Count;
+      // Old Param maps to index of Expr in ArgExprs
+      // This allows us to map packs to mutliple exprs when we transform
+      ParamMap[P] = std::distance(ArgExprs.begin(), ArgExprsItr);
+      ArgExprsItr += Count;
     } else {
-      // Old Param maps to index of New Param in NewParmVarDecls
+      // Old Param maps to index of new ParmVarDecl in NewParmVarDecls
       // This allows us to map packs to mutliple vars when we transform
       ParamMap[P] = NewParmVarDecls.size();
 
       int Count = P->isParameterPack() ? PackSize : 1;
       for (int i = 0; i < Count; i++) {
-        assert(ArgsExprItr >= ArgsExpr.end() && "ArgsExprItr out of range");
-        ParmVarDecl *New = CreateParametricExpressionParmVar(*this, P, *ArgsExprItr);
+        assert(ArgExprsItr >= ArgExpr.end() && "ArgExprsItr out of range");
+        ParmVarDecl *New = CreateParametricExpressionParmVar(*this, P, *ArgExprsItr);
         NewParmVarDecls.push_back(New);
-        ++ArgsExprItr;
+        ++ArgExprsItr;
       }
     }
   }
 
-  // Recreate the WHOLE Output
-  // Find all the DeclRefs and replace their VarDecls
-  // with the new shiny VarDecl
-  // For "using" params supposedly we can just
-  // substitute the DeclRefExprs with the ArgExpr
-  //
-  // This could be done with TreeTransform
-  // if I understand it correctly
+  ParametricExpressionRebuilder Rebuilder(*this, ParamMap, NewParmVarDecls, ArgExprs);
+
+  if (CompoundStmt::classof(Output)) {
+    StmtResult CSResult = Rebuilder.TransformStmt(Output);
+    if (CSResult.isInvalid())
+      return ExprError();
+
+    // TODO
+    // Create a ParametricExpressionExpr which requires code gen and stuff   
+    // Output = ParametricExpressionExpr::Create(...);
+    // NewParmVarDecls should belong to ParametricExpressionExpr
+  } else {
+    return Rebuilder.TransformExpr(Output);
+  }
 }
