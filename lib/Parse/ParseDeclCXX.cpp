@@ -696,7 +696,7 @@ Parser::ParseUsingDeclaration(DeclaratorContext Context,
     }
 
     Decl *DeclFromDeclSpec = nullptr;
-    Decl *AD = ParseParametricExpressionDeclarationAfterDeclarator(
+    Decl *AD = ParseParametricExpressionDeclarationAfterUsingDeclarator(
         UsingLoc, D, DeclEnd, AS, &DeclFromDeclSpec);
     return Actions.ConvertDeclToDeclGroup(AD, DeclFromDeclSpec);
   }
@@ -828,7 +828,7 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
                                        DeclFromDeclSpec);
 }
 
-Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
+Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
     SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
     AccessSpecifier AS, Decl **OwnedType) {
   Scope* S = getCurScope();
@@ -887,16 +887,18 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterDeclarator(
   }
   T.consumeClose();
 
-  // TODO PushFunctionScope here is kind of a hack
+  Decl *PD = Actions.ActOnParametricExpressionDecl(S, AS, UsingLoc,
+                                                   ParametricExpressionDeclarator);
+
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
-                                 Scope::CompoundStmtScope);
-  StmtResult CompoundStmtResult(ParseCompoundStatementBody(true));
+                             Scope::CompoundStmtScope);
+  PD = Actions.ActOnFinishParametricExpressionDecl(
+        static_cast<ParametricExpressionDecl*>(PD),
+        ParamInfo, ParseCompoundStatementBody());
   BodyScope.Exit();
 
-  return Actions.ActOnParametricExpressionDecl(S, AS, UsingLoc,
-                                               ParametricExpressionDeclarator,
-                                               ParamInfo, CompoundStmtResult);
+  return PD;
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.

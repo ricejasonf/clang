@@ -10535,9 +10535,7 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 
 Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                           SourceLocation UsingLoc,
-                                          Declarator &ParametricExpressionDeclarator,
-                                          MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                          StmtResult CompoundStmtResult) {
+                                          Declarator &ParametricExpressionDeclarator) {
   DeclarationNameInfo NameInfo = GetNameForDeclarator(
       ParametricExpressionDeclarator);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
@@ -10570,8 +10568,31 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     return nullptr;
   }
 
+  // TInfo is just a dummy since parametric expression
+  // declarators do not actually name a type
+  TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
+  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext,
+                                                                   NameInfo, UsingLoc,
+                                                                   TInfo);
+  if (New) {
+    PushOnScopeChains(New, S);
+  }
+
+  PushDeclContext(S, New);
+
+  return New;
+}
+
+Decl *Sema::ActOnFinishParametricExpressionDecl(
+                                    ParametricExpressionDecl* New,
+                                    MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
+                                    StmtResult CompoundStmtResult) {
   bool NeedsRAII = false;
+
+  // Params
+
   SourceLocation PackLocation{};
+  SmallVector<ParmVarDecl*, 16> Params;
   for (auto& P : ParamInfo) {
     assert(P.Param && "ParamInfo param decl must not be null");
 
@@ -10582,7 +10603,6 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
       NeedsRAII = true;
     }
 
-    // FIXME: I doubt this check does anything
     if (PD->isParameterPack()) {
       if (PackLocation.isValid()) {
         Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);
@@ -10594,7 +10614,13 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
         PackLocation = PD->getBeginLoc();
       }
     }
+
+    Params.push_back(PD);
   }
+
+  New->setParams(Params);
+
+  // Body
 
   if (CompoundStmtResult.isInvalid())
     return nullptr;
@@ -10622,27 +10648,11 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
     assert(false && "Empty parametric expression definition not supported yet.");
   }
 
-  // TInfo is just a dummy since parametric expression
-  // declarators do not actually name a type
-  TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
-  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext, 
-                                                                   NameInfo, Body, UsingLoc,
-                                                                   TInfo);
+  // Body isn't necessarily a compound statement so we will see
+  // how that flies since this is a member of FunctionDecl
+  New->setBody(Body);
 
-  if (ParamInfo.size() > 0) {
-    SmallVector<ParmVarDecl*, 16> Params;
-    for (int i = 0, e = ParamInfo.size(); i != e; ++i) {
-      ParmVarDecl *PD = dyn_cast<ParmVarDecl>(ParamInfo[i].Param);
-      assert(PD && "ParamInfo::Param was not a ParmVarDecl");
-      Params.push_back(PD);
-    }
-
-    New->setParams(Context, Params);
-  }
-
-  if (New) {
-    PushOnScopeChains(New, S);
-  }
+  PopDeclContext();
 
   return New;
 }

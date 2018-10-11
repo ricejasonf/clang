@@ -7906,28 +7906,12 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 }
 
 namespace {
-ParmVarDecl* CreateParametricExpressionParmVar(Sema& SemaRef, ParmVarDecl* Old, Expr *E) {
-  TypeSourceInfo *NewDI = SemaRef.getTypeSourceInfo(SemaRef.Context,
-      SemaRef.Context.getRValueReference(E->getType()));
-  ParmVarDecl *New = ParmVarDecl::Create(SemaRef.Context,
-                                         Old->getDeclContext(),
-                                         Old->getInnerLocStart(),
-                                         Old->getLocation(),
-                                         Old->getIdentifier(),
-                                         NewDI->getType(), NewDI,
-                                         OldParm->getStorageClass(),
-                                         /* DefArg */ nullptr);
-  New->setInit(E);
-  return New;
-}
-
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
   using Base = TreeTransform<ParametricExpressionRebuilder>;
   using ParamVec = llvm::SmallVectorImpl<ParmVarDecl*>;
   using ParamMap = llvm::SmallDenseMap<ParmVarDecl*, unsigned>;
   // ParamMap maps to index of ParmVec or MultiExprArg
 
-  Sema &SemaRef;
   ParamMap& PMap;
   ParamVec& PVec;
   MultiExprArg ArgExprs;
@@ -7938,7 +7922,7 @@ public:
     : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
 
   ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
-    auto PMapItr = PMap.find(E->getDecl());
+    auto PMapItr = PMap.find(cast_or_null<ParmVarDecl>(E->getDecl()));
     if (PMapItr != PMap.end()) {
       ParmVarDecl* OP = PMapItr->first;
       if (OP->isParameterPack()) {
@@ -7948,13 +7932,13 @@ public:
           assert(false && "TODO Implement UsingParmPackExpr");
           /*
           return UsingParmPackExpr::Create(getSema().Context, E->getType(),
-                                           OP, E->getExprLoc()
-                                           ArrayRef(ArgExprs[PMapItr->second], PackSize));
+                                           OP, E->getExprLoc(),
+                                           ArrayRef<Expr*>(ArgExprs[PMapItr->second], PackSize));
           */
         } else {
           return FunctionParmPackExpr::Create(getSema().Context, E->getType(),
-                                              OP, E->getExprLoc()
-                                              ArrayRef(PVec[PMapItr->second], PackSize));
+                                              OP, E->getExprLoc(),
+                                              ArrayRef<ParmVarDecl*>(&(PVec[PMapItr->second]), PackSize));
         }
       } else {
         if (OP->isUsingSpecified()) {
@@ -7969,11 +7953,15 @@ public:
         }
       }
     }
+    
+    // not the E you are looking for
+    return E;
   }
 };
 }
 
-ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs) {
+ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
+                                           SourceLocation LParenLoc) {
   assert(false && "BuildParametricExpression not implemented yet");
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
@@ -7990,16 +7978,17 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
   // If PackSize is negative then there must not be a param pack
   // Or the user gave us an invalid arity
   if ((PackCount == 1 && PackSize < 0) || (ArgExprs.size() != D->getNumParams())) {
-    Diag(Tok.getLocation(), diag::err_parametric_expression_arg_list_different_arity)
-      << ((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0;
+    Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
+      << (((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0);
+    // TODO note the declaration
   }
 
-  Stmt *Output = D->getOutput();
+  Stmt *Output = D->getBody();
   assert(Output && "ParametricExpressionDecl Output is nullptr");
 
   auto ArgExprsItr = ArgExprs.begin();
-  llvm::SmallVectorImpl<ParmVarDecl*> NewParmVarDecls{};
-  llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap{};
+  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls;
+  llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap;
   ParamMap.init(D->getNumParams());
 
   // iterate declared params
@@ -8017,8 +8006,18 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
 
       int Count = P->isParameterPack() ? PackSize : 1;
       for (int i = 0; i < Count; i++) {
-        assert(ArgExprsItr >= ArgExpr.end() && "ArgExprsItr out of range");
-        ParmVarDecl *New = CreateParametricExpressionParmVar(*this, P, *ArgExprsItr);
+        assert(ArgExprsItr >= ArgExprs.end() && "ArgExprsItr out of range");
+        TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
+            Context.getRValueReferenceType((*ArgExprsItr)->getType()));
+        ParmVarDecl *New = ParmVarDecl::Create(Context,
+                                               P->getDeclContext(),
+                                               P->getInnerLocStart(),
+                                               P->getLocation(),
+                                               P->getIdentifier(),
+                                               NewDI->getType(), NewDI,
+                                               P->getStorageClass(),
+                                               /* DefArg */ nullptr);
+        New->setInit(*ArgExprsItr);
         NewParmVarDecls.push_back(New);
         ++ArgExprsItr;
       }
@@ -8036,7 +8035,11 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
     // Create a ParametricExpressionExpr which requires code gen and stuff   
     // Output = ParametricExpressionExpr::Create(...);
     // NewParmVarDecls should belong to ParametricExpressionExpr
+
+
+    return ExprError();
   } else {
-    return Rebuilder.TransformExpr(Output);
+    // Output should be an Expr at this point
+    return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
   }
 }

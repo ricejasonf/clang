@@ -2916,21 +2916,9 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
 ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
                             const DeclarationNameInfo &DN,
-                            Stmt* Output, SourceLocation StartL,
+                            SourceLocation StartL,
                             TypeSourceInfo *TInfo) {
   ParametricExpressionDecl *New =
-      new (C, DC) ParametricExpressionDecl(C, DC, DN, Output, StartL, TInfo);
+      new (C, DC) ParametricExpressionDecl(C, DC, DN, StartL, TInfo);
   return New;
-}
-
-void ParametricExpressionDecl::setParams(ASTContext &C,
-                                         ArrayRef<ParmVarDecl *> NewParamInfo) {
-  assert(!ParamInfo && "Already has param info!");
-  NumParams = NewParamInfo.size();
-
-  // Zero params -> null pointer.
-  if (!NewParamInfo.empty()) {
-    ParamInfo = new (C) ParmVarDecl*[NewParamInfo.size()];
-    std::copy(NewParamInfo.begin(), NewParamInfo.end(), ParamInfo);
-  }
 }

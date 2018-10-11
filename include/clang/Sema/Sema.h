@@ -4671,11 +4671,13 @@ public:
 
   Decl *ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
                                       SourceLocation UsingLoc,
-                                      Declarator &ParametricExpressionDeclarator,
+                                      Declarator &ParametricExpressionDeclarator);
+  Decl *ActOnFinishParametricExpressionDecl(
+                                      ParametricExpressionDecl* D,
                                       MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                       StmtResult CompoundStmtResult);
 
-  Expr *BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs);
+  ExprResult BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs, SourceLocation LParenLoc);
 
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,

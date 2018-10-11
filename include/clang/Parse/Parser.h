@@ -2688,7 +2688,7 @@ private:
       UsingDeclarator &D, SourceLocation &DeclEnd, AccessSpecifier AS,
       ParsedAttributes &Attrs, Decl **OwnedType = nullptr);
 
-  Decl *ParseParametricExpressionDeclarationAfterDeclarator(
+  Decl *ParseParametricExpressionDeclarationAfterUsingDeclarator(
     SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
     AccessSpecifier AS, Decl **OwnedType = nullptr);
 

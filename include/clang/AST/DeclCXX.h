@@ -3948,21 +3948,20 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
 
 // ParametricExpressionDecl
 class ParametricExpressionDecl : public FunctionDecl {
-  Stmt* Output;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
 
 protected:
   ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
-                           Stmt *O, SourceLocation StartL, TypeSourceInfo* TInfo)
+                           SourceLocation StartL, TypeSourceInfo* TInfo)
     : FunctionDecl(ParametricExpression, C, DC, StartL, DN, C.DependentTy, TInfo,
-                   SC_None, false, false),
-      Output(O) {}
+                   SC_None, false, false)
+      {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           const DeclarationNameInfo &DN,
-                                          Stmt *B, SourceLocation StartL,
+                                          SourceLocation StartL,
                                           TypeSourceInfo* TInfo);
   bool hasLinkage() {
     return false;
@@ -3971,24 +3970,6 @@ public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
   static bool classofKind(Kind K) { return K == ParametricExpression; }
-
-  Stmt *getOutput() {
-    // nullptr, Expr, or CompoundStmt
-    return Output;
-  }
-
-  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
-
-  unsigned getNumParams() const { return NumParams; }
-
-
-  // ArrayRef interface to parameters.
-  ArrayRef<ParmVarDecl *> parameters() const {
-    return {ParamInfo, getNumParams()};
-  }
-  MutableArrayRef<ParmVarDecl *> parameters() {
-    return {ParamInfo, getNumParams()};
-  }
 };
 
 } // namespace clang
