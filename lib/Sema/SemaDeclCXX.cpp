@@ -10533,8 +10533,10 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
   return NewND;
 }
 
-Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
-                                          SourceLocation UsingLoc,
+ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
+                                          Scope *S, Scope *BodyScope,
+                                          SourceLocation UsingLoc, bool &NeedsRAII,
+                                          MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                           Declarator &ParametricExpressionDeclarator) {
   DeclarationNameInfo NameInfo = GetNameForDeclarator(
       ParametricExpressionDeclarator);
@@ -10571,23 +10573,15 @@ Decl *Sema::ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
   // TInfo is just a dummy since parametric expression
   // declarators do not actually name a type
   TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
-  ParametricExpressionDecl* New = ParametricExpressionDecl::Create(Context, CurContext,
+  ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
                                                                    NameInfo, UsingLoc,
                                                                    TInfo);
+
   if (New) {
     PushOnScopeChains(New, S);
   }
 
-  PushDeclContext(S, New);
-
-  return New;
-}
-
-Decl *Sema::ActOnFinishParametricExpressionDecl(
-                                    ParametricExpressionDecl* New,
-                                    MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                    StmtResult CompoundStmtResult) {
-  bool NeedsRAII = false;
+  PushDeclContext(BodyScope, New);
 
   // Params
 
@@ -10608,6 +10602,7 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
         Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);
         Diag(PackLocation, diag::note_entity_declared_at)
           << "Previous parameter pack";
+        PopDeclContext();
         return nullptr;
       }
       else {
@@ -10615,15 +10610,31 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
       }
     }
 
+    PD->setOwningFunction(New);
+
+    if (PD->getIdentifier()) {
+      CheckShadow(BodyScope, PD);
+      PushOnScopeChains(PD, BodyScope);
+    }
+
     Params.push_back(PD);
   }
 
-  New->setParams(Params);
+  New->setParams(Context, Params);
+
+  return New;
+}
+
+Decl *Sema::ActOnFinishParametricExpressionDecl(
+                                    ParametricExpressionDecl* New,
+                                    bool NeedsRAII,
+                                    StmtResult CompoundStmtResult) {
+  if (!New || CompoundStmtResult.isInvalid())
+    return nullptr;
+
+  PopDeclContext();
 
   // Body
-
-  if (CompoundStmtResult.isInvalid())
-    return nullptr;
 
   CompoundStmt *CS = CompoundStmtResult.getAs<CompoundStmt>();
   assert(CS->getStmtClass() == Stmt::CompoundStmtClass && "Expecting a CompoundStmt");
@@ -10651,8 +10662,6 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
   // Body isn't necessarily a compound statement so we will see
   // how that flies since this is a member of FunctionDecl
   New->setBody(Body);
-
-  PopDeclContext();
 
   return New;
 }

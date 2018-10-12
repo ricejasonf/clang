@@ -2922,3 +2922,16 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
       new (C, DC) ParametricExpressionDecl(C, DC, DN, StartL, TInfo);
   return New;
 }
+
+void ParametricExpressionDecl::setParams(ASTContext &C,
+                                         ArrayRef<ParmVarDecl *> NewParamInfo) {
+  assert(!ParamInfo && "Already has param info!");
+  NumParams = NewParamInfo.size();
+
+  // Zero params -> null pointer.
+  if (!NewParamInfo.empty()) {
+    ParamInfo = new (C) ParmVarDecl*[NewParamInfo.size()];
+    std::copy(NewParamInfo.begin(), NewParamInfo.end(), ParamInfo);
+  }
+}
+

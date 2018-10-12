@@ -886,19 +886,21 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
                                     attrs, ParamInfo, EllipsisLoc);
   }
   T.consumeClose();
+  PrototypeScope.Exit();
 
-  Decl *PD = Actions.ActOnParametricExpressionDecl(S, AS, UsingLoc,
-                                                   ParametricExpressionDeclarator);
-
+  bool NeedsRAII = false;
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                              Scope::CompoundStmtScope);
-  PD = Actions.ActOnFinishParametricExpressionDecl(
-        static_cast<ParametricExpressionDecl*>(PD),
-        ParamInfo, ParseCompoundStatementBody());
+  ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
+                                                   S, getCurScope(), UsingLoc, NeedsRAII,
+                                                   ParamInfo, ParametricExpressionDeclarator);
+  StmtResult CSResult = ParseCompoundStatement();
+  Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New, NeedsRAII, CSResult);
   BodyScope.Exit();
+  Actions.PopFunctionScopeInfo();
 
-  return PD;
+  return TheDecl;
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.

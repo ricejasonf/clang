@@ -2368,6 +2368,10 @@ public:
   /// in a 'block', this returns the containing context.
   NamedDecl *getCurFunctionOrMethodDecl();
 
+  /// getCurParametricExpressionDecl - If inside of a parametric expression body,
+  /// this returns a pointer to the decl being parsed.
+  ParametricExpressionDecl *getCurParametricExpressionDecl();
+
   /// Add this decl to the scope shadowed decl chains.
   void PushOnScopeChains(NamedDecl *D, Scope *S, bool AddToContext = true);
 
@@ -4669,13 +4673,14 @@ public:
                               const ParsedAttributesView &AttrList,
                               TypeResult Type, Decl *DeclFromDeclSpec);
 
-  Decl *ActOnParametricExpressionDecl(Scope *S, AccessSpecifier AS,
+  ParametricExpressionDecl *ActOnParametricExpressionDecl(
+                                      Scope *S, Scope *BodyScope,
                                       SourceLocation UsingLoc,
-                                      Declarator &ParametricExpressionDeclarator);
-  Decl *ActOnFinishParametricExpressionDecl(
-                                      ParametricExpressionDecl* D,
+                                      bool &NeedsRAII,
                                       MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                      StmtResult CompoundStmtResult);
+                                      Declarator &ParametricExpressionDeclarator);
+  Decl *ActOnFinishParametricExpressionDecl(ParametricExpressionDecl* D, bool NeedsRAII,
+                                            StmtResult CompoundStmtResult);
 
   ExprResult BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs, SourceLocation LParenLoc);
 

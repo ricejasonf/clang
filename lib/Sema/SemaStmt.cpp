@@ -3458,6 +3458,10 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
 }
 
 StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
+  if (getCurParametricExpressionDecl()) {
+    return new (Context) ReturnStmt(ReturnLoc, RetValExp, nullptr);
+  }
+
   // Check for unexpanded parameter packs.
   if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp))
     return StmtError();

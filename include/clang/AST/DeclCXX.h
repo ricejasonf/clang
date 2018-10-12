@@ -3967,6 +3967,17 @@ public:
     return false;
   }
 
+  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
+  unsigned getNumParams() const { return NumParams; }
+
+  // ArrayRef interface to parameters.
+  ArrayRef<ParmVarDecl *> parameters() const {
+    return {ParamInfo, getNumParams()};
+  }
+  MutableArrayRef<ParmVarDecl *> parameters() {
+    return {ParamInfo, getNumParams()};
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { return classofKind(D->getKind()); }
   static bool classofKind(Kind K) { return K == ParametricExpression; }

@@ -7962,7 +7962,6 @@ public:
 
 ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
                                            SourceLocation LParenLoc) {
-  assert(false && "BuildParametricExpression not implemented yet");
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
