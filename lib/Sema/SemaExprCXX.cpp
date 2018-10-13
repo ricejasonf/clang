@@ -8008,9 +8008,8 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
       // This allows us to map packs to mutliple vars when we transform
       ParamMap[P] = NewParmVarDecls.size();
 
-      int Count = P->isParameterPack() ? PackSize : 1;
       for (int i = 0; i < Count; i++) {
-        assert(ArgExprsItr >= ArgExprs.end() && "ArgExprsItr out of range");
+        assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
         TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
             Context.getRValueReferenceType((*ArgExprsItr)->getType()));
         ParmVarDecl *New = ParmVarDecl::Create(Context,
