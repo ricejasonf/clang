@@ -7330,7 +7330,11 @@ ExprResult Sema::IgnoredValueConversions(Expr *E) {
 //        delete, lambda-expr, dynamic-cast, reinterpret-cast etc...
 static inline bool VariableCanNeverBeAConstantExpression(VarDecl *Var,
     ASTContext &Context) {
-  if (isa<ParmVarDecl>(Var)) return true;
+  if (isa<ParmVarDecl>(Var)) {
+    if(cast<ParmVarDecl>(Var)->isUsingSpecified())
+      return false;
+    return true;
+  }
   const VarDecl *DefVD = nullptr;
 
   // If there is no initializer - this can not be a constant expression.
@@ -7915,11 +7919,16 @@ class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionR
   ParamMap& PMap;
   ParamVec& PVec;
   MultiExprArg ArgExprs;
+  bool ExpandingExprAlias = false;
 
 public:
   ParametricExpressionRebuilder(Sema &SemaRef, ParamMap& PM,
                                 ParamVec& PV, MultiExprArg A)
     : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
+
+  bool AlwasyRebuild() {
+    return  ExpandingExprAlias || Base::AlwaysRebuild();
+  }
 
   ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
     Decl* D = E->getDecl();
@@ -7948,7 +7957,10 @@ public:
       } else {
         if (OP->isUsingSpecified()) {
           // Substitute the DeclRef with the Expr
-          return ArgExprs[PMapItr->second];
+          ExpandingExprAlias = true;
+          ExprResult New =  TransformExpr(ArgExprs[PMapItr->second]);
+          ExpandingExprAlias = false;
+          return New;
         } else {
           // rebuild declref to point to the mapped ParmVarDecl
           return getDerived().RebuildDeclRefExpr(E->getQualifierLoc(),
@@ -7959,8 +7971,7 @@ public:
       }
     }
     
-    // not the E you are looking for
-    return E;
+    return Base::TransformDeclRefExpr(E);
   }
 };
 }

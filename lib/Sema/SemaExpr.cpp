@@ -15254,6 +15254,12 @@ static void DoMarkVarDeclReferenced(Sema &SemaRef, SourceLocation Loc,
                                     VarDecl *Var, Expr *E) {
   assert((!E || isa<DeclRefExpr>(E) || isa<MemberExpr>(E)) &&
          "Invalid Expr argument to DoMarkVarDeclReferenced");
+
+  // Using parameters are never ODR used
+  // so I think we can skip all of this - JASON
+  if (isa<ParmVarDecl>(Var) && cast<ParmVarDecl>(Var)->isUsingSpecified())
+    return;
+
   Var->setReferenced();
 
   TemplateSpecializationKind TSK = Var->getTemplateSpecializationKind();
