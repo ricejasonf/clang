@@ -7922,7 +7922,12 @@ public:
     : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
 
   ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
-    auto PMapItr = PMap.find(cast_or_null<ParmVarDecl>(E->getDecl()));
+    Decl* D = E->getDecl();
+    if (!isa<ParmVarDecl>(D)) {
+      D = nullptr;
+    }
+
+    auto PMapItr = PMap.find(cast_or_null<ParmVarDecl>(D));
     if (PMapItr != PMap.end()) {
       ParmVarDecl* OP = PMapItr->first;
       if (OP->isParameterPack()) {
