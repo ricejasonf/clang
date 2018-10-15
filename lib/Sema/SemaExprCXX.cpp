@@ -8031,7 +8031,10 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
                                                NewDI->getType(), NewDI,
                                                P->getStorageClass(),
                                                /* DefArg */ nullptr);
-        New->setInit(*ArgExprsItr);
+        ExprResult InitExprResult = MaybeBindToTemporary(*ArgExprsItr);
+        if (InitExprResult.isInvalid()
+          return ExprError();
+        New->setInit(InitExprResult.get());
         NewParmVarDecls.push_back(New);
         ++ArgExprsItr;
       }

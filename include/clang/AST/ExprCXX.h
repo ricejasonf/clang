@@ -4819,6 +4819,65 @@ public:
   }
 };
 
+// ParametricExpressionExpr - A compound statement with RAII scope that
+//                            evaluates as an expression based on its
+//                            return value
+//                           
+class ParametricExpressionExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParmVarDecl** ParamInfo;
+  Stmt *Children[2];
+  unsigned NumParams = 0;
+  // The CompoundStmt Body is in Children[0]
+  // The Param Init Exprs are in Children[1]
+
+  ParametricExpressionExpr(SourceLocation BL)
+    : Expr(ParametricExpressionExprClass, QualType(), VK_LValue, OK_Ordinary,
+           false, false, false, false),
+      BeginLoc(BL),
+      Body(B) {}
+public:
+  static ParametricExpressionExpr *Create(ASTContext &C, SourceLocation BL,
+                                          CompoundStmt *B,
+                                          ArrayRef<ParmVarDecl *> Params);
+
+  CompoundStmt *getBody() { return Children[0]; }
+
+  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
+  unsigned getNumParams() const { return NumParams; }
+
+  // ArrayRef interface to parameters.
+  ArrayRef<ParmVarDecl *> parameters() const {
+    return {ParamInfo, getNumParams()};
+  }
+  MutableArrayRef<ParmVarDecl *> parameters() {
+    return {ParamInfo, getNumParams()};
+  }
+
+  ArrayRef<ParmVarDecl *> init_expressions() const {
+    return {Children[1], getNumParams()};
+  }
+  MutableArrayRef<ParmVarDecl *> init_expressions() {
+    return {Children[1], getNumParams()};
+  }
+
+  // Iterators
+  child_range children() {
+    if (NumParams > 0) {
+      return child_range(Children[0], Children[1]);
+    }
+    else {
+      return Children[0].children();
+    }
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ParametricExpressionExprClass;
+  }
+};
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_EXPRCXX_H

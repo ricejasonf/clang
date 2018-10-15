@@ -1449,3 +1449,27 @@ TypeTraitExpr *TypeTraitExpr::CreateDeserialized(const ASTContext &C,
 }
 
 void ArrayTypeTraitExpr::anchor() {}
+
+
+static ParametricExpressionExpr *ParametricExpressionExpr::Create(
+                                      ASTContext &C, SourceLocation BL,
+                                      CompoundStmt *B,
+                                      ArrayRef<ParmVarDecl *> Params) {
+  ParametricExpressionExpr *New = new (C) ParametricExpressionExpr(BL, B);
+  New.Children[0] = B;
+  New.NumParams = Params.size();
+
+  if (!Params.empty()) {
+    New.ParamInfo = new (C) ParmVarDecl*[Params.size()];
+    std::copy(Params.begin(), Params.end(), ParamInfo);
+
+    Expr *ParamInitExprs = new (C) Expr*[Params.size()];
+    for (int i = 0; i < Params.size(); i++) {
+      ParamInitExprs[i] = Params[i].getInit();
+    }
+
+    Children[1] = ParamInitExprs;
+  }
+}
+
+
