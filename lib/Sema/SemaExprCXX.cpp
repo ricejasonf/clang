@@ -7926,7 +7926,7 @@ public:
                                 ParamVec& PV, MultiExprArg A)
     : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
 
-  bool AlwasyRebuild() {
+  bool AlwaysRebuild() {
     return  ExpandingExprAlias || Base::AlwaysRebuild();
   }
 
