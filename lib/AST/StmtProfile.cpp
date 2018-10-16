@@ -1994,6 +1994,10 @@ void StmtProfiler::VisitParametricExpressionIdExpr(const ParametricExpressionIdE
   VisitExpr(S);
 }
 
+void StmtProfiler::VisitParametricExpressionExpr(const ParametricExpressionExpr *S) {
+  VisitExpr(S);
+}
+
 void Stmt::Profile(llvm::FoldingSetNodeID &ID, const ASTContext &Context,
                    bool Canonical) const {
   StmtProfilerWithPointers Profiler(ID, Context, Canonical);

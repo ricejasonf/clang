@@ -7976,7 +7976,7 @@ public:
 };
 }
 
-ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
+ExprResult Sema::ActOnParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
                                            SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
@@ -8021,20 +8021,9 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
 
       for (int i = 0; i < Count; i++) {
         assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
-        TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
-            Context.getRValueReferenceType((*ArgExprsItr)->getType()));
-        ParmVarDecl *New = ParmVarDecl::Create(Context,
-                                               P->getDeclContext(),
-                                               P->getInnerLocStart(),
-                                               P->getLocation(),
-                                               P->getIdentifier(),
-                                               NewDI->getType(), NewDI,
-                                               P->getStorageClass(),
-                                               /* DefArg */ nullptr);
-        ExprResult InitExprResult = MaybeBindToTemporary(*ArgExprsItr);
-        if (InitExprResult.isInvalid()
+        ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
+        if (!New)
           return ExprError();
-        New->setInit(InitExprResult.get());
         NewParmVarDecls.push_back(New);
         ++ArgExprsItr;
       }
@@ -8048,15 +8037,32 @@ ExprResult Sema::BuildParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
     if (CSResult.isInvalid())
       return ExprError();
 
-    // TODO
-    // Create a ParametricExpressionExpr which requires code gen and stuff   
-    // Output = ParametricExpressionExpr::Create(...);
-    // NewParmVarDecls should belong to ParametricExpressionExpr
-
-
-    return ExprError();
+    return ParametricExpressionExpr::Create(Context, LParenLoc,
+                                            CSResult.getAs<CompoundStmt>(),
+                                            NewParmVarDecls);
   } else {
     // Output should be an Expr at this point
     return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
   }
 }
+
+// used in ActOnParametricExpression and
+// TreeTransform<Derived>::TransformParametricExpressionExpr
+ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr) {
+  TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
+      Context.getRValueReferenceType(ArgExpr->getType()));
+  ParmVarDecl *New = ParmVarDecl::Create(Context,
+                                         OldParam->getDeclContext(),
+                                         OldParam->getInnerLocStart(),
+                                         OldParam->getLocation(),
+                                         OldParam->getIdentifier(),
+                                         NewDI->getType(), NewDI,
+                                         OldParam->getStorageClass(),
+                                         /* DefArg */ nullptr);
+  ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
+  if (InitExprResult.isInvalid())
+    return nullptr;
+  New->setInit(InitExprResult.get());
+  return New;
+}
+

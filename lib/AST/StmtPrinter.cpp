@@ -2803,6 +2803,10 @@ void StmtPrinter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *No
   OS << Node->getDefinitionDecl()->getName();
 }
 
+void StmtPrinter::VisitParametricExpressionExpr(ParametricExpressionExpr *Node) {
+  // TODO JASON might have to store the original CallExpr and print that idk
+}
+
 //===----------------------------------------------------------------------===//
 // Stmt method implementations
 //===----------------------------------------------------------------------===//

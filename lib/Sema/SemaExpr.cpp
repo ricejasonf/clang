@@ -5359,7 +5359,7 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
     }
 
     if (isa<ParametricExpressionIdExpr>(Fn)) {
-      return BuildParametricExpression(Scope, Fn, ArgExprs, LParenLoc);
+      return ActOnParametricExpression(Scope, Fn, ArgExprs, LParenLoc);
     }
 
     // Determine whether this is a call to an object (C++ [over.call.object]).

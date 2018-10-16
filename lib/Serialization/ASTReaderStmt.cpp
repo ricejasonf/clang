@@ -702,6 +702,10 @@ void ASTStmtReader::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *
   // TODO add friend class ASTStmtReader
 }
 
+void ASTStmtReader::VisitParametricExpressionExpr(ParametricExpressionExpr *E) {
+  llvm_unreachable("Cannot read ParametricExpressionExpr nodes");
+}
+
 void ASTStmtReader::VisitObjCIsaExpr(ObjCIsaExpr *E) {
   VisitExpr(E);
   E->setBase(Record.readSubExpr());

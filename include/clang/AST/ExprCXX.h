@@ -4825,23 +4825,22 @@ public:
 //                           
 class ParametricExpressionExpr : public Expr {
   SourceLocation BeginLoc;
-  ParmVarDecl** ParamInfo;
-  Stmt *Children[2];
   unsigned NumParams = 0;
+  ParmVarDecl** ParamInfo;
+  Stmt **Children;
   // The CompoundStmt Body is in Children[0]
-  // The Param Init Exprs are in Children[1]
+  // The Param Init Exprs are in Children[I + 1]
 
-  ParametricExpressionExpr(SourceLocation BL)
+  ParametricExpressionExpr(SourceLocation BL, CompoundStmt* B)
     : Expr(ParametricExpressionExprClass, QualType(), VK_LValue, OK_Ordinary,
            false, false, false, false),
-      BeginLoc(BL),
-      Body(B) {}
+      BeginLoc(BL) {}
 public:
   static ParametricExpressionExpr *Create(ASTContext &C, SourceLocation BL,
                                           CompoundStmt *B,
                                           ArrayRef<ParmVarDecl *> Params);
 
-  CompoundStmt *getBody() { return Children[0]; }
+  CompoundStmt *getBody() { return static_cast<CompoundStmt*>(Children[0]); }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
   unsigned getNumParams() const { return NumParams; }
@@ -4854,20 +4853,20 @@ public:
     return {ParamInfo, getNumParams()};
   }
 
-  ArrayRef<ParmVarDecl *> init_expressions() const {
-    return {Children[1], getNumParams()};
+  ArrayRef<Expr *> init_expressions() const {
+    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
   }
-  MutableArrayRef<ParmVarDecl *> init_expressions() {
-    return {Children[1], getNumParams()};
+  MutableArrayRef<Expr *> init_expressions() {
+    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
   }
 
   // Iterators
   child_range children() {
     if (NumParams > 0) {
-      return child_range(Children[0], Children[1]);
+      return child_range(Children, Children + 1 + NumParams);
     }
     else {
-      return Children[0].children();
+      return child_range(Children, Children + 1);
     }
   }
 

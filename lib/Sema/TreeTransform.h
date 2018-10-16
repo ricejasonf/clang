@@ -3243,6 +3243,16 @@ public:
                                             RParenLoc);
   }
 
+  // Build a new parametric expression that has compound statements
+  //
+  // By default, just creates a new one with the given inputs
+  ExprResult RebuildParametricExpressionExpr(SourceLocation BeginLoc, 
+                                             CompoundStmt *Body,
+                                             ArrayRef<ParmVarDecl *> Params) {
+    return ParametricExpressionExpr::Create(SemaRef.Context, BeginLoc, Body,
+                                            Params);
+  }
+
 private:
   TypeLoc TransformTypeInObjectScope(TypeLoc TL,
                                      QualType ObjectType,
@@ -12786,8 +12796,50 @@ template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformParametricExpressionIdExpr(
     ParametricExpressionIdExpr *E) {
-  // Would we transform the decl that this points to here?
   return E;
+}
+
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformParametricExpressionExpr(
+    ParametricExpressionExpr *E) {
+  // Not sure if there is a case for having this - JASON
+  llvm_unreachable("TransformParametricExpressionExpr implemented but not tested");
+
+  // Transform arguments/parameters.
+  bool ArgChanged = false;
+  SmallVector<ParmVarDecl*, 8> NewParams(E->getNumParams());
+  for (ParmVarDecl *OldParam : E->parameters()) {
+    ParmVarDecl *NewParam;
+    ExprResult R = getDerived().TransformExpr(OldParam->getInit());
+    if (R.isInvalid())
+      return ExprError();
+    if (R.get() != OldParam->getInit()) {
+      // Rebuild the ParmVarDecl
+      NewParam = getSema().BuildParametricExpressionParam(OldParam, R.get());
+      ArgChanged = true;
+    }
+    else {
+      NewParam = OldParam;
+    }
+
+    NewParams.push_back(NewParam);
+  }
+
+  // Transform body
+  // We aren't handling the possibility that this would do the
+  // RAII scope elision thing, but it is moot at this point
+  StmtResult BodyResult = TransformCompoundStmt(E->getBody());
+  if (BodyResult.isInvalid())
+    return ExprError();
+
+  CompoundStmt *Body = BodyResult.getAs<CompoundStmt>();
+
+  if (getDerived().AlwaysRebuild() || ArgChanged || Body != E->getBody()) {
+    return RebuildParametricExpressionExpr(E->getBeginLoc(), Body, NewParams);
+  } else {
+    return E;
+  }
 }
 
 } // end namespace clang
