@@ -7976,8 +7976,9 @@ public:
 };
 }
 
-ExprResult Sema::ActOnParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
-                                           SourceLocation LParenLoc) {
+ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
+                                                   MultiExprArg ArgExprs,
+                                                   SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
@@ -8037,7 +8038,7 @@ ExprResult Sema::ActOnParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgE
     if (CSResult.isInvalid())
       return ExprError();
 
-    return ParametricExpressionExpr::Create(Context, LParenLoc,
+    return ParametricExpressionCallExpr::Create(Context, LParenLoc,
                                             CSResult.getAs<CompoundStmt>(),
                                             NewParmVarDecls);
   } else {

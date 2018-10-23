@@ -2269,3 +2269,47 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
     }
   }
 }
+
+llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
+                                          const ParametricExpressionCallExpr* E,
+                                          AggValueSlot AggSlot) {
+  Address OldReturnValue = ReturnValue;
+
+  QualType RetTy = E->getType();
+  CompoundStmt *Body = E->getBody();
+  PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body.getBeginLoc(),
+                             "LLVM IR generation of parametric expression call ('{}')");
+
+  LexicalScope Scope(*this, Body.getSourceRange());
+
+  if (hasAggregateEvaluationKind(RetTy)) {
+    // This is a naive guess on how we can just
+    // write to the AggSlot from the ReturnStmt
+    ReturnValue = AggSlot.getAddress();
+  } else {
+    ReturnValue = CreateIRTemp(RetTy, "retval");
+  }
+
+  // TODO not sure if this is needed
+  //      Also we don't store the decl of the callee
+  /*
+  GlobalDecl GD(E->getCalleeDecl());
+  ApplyInlineDebugLocation DebugScope(*this, GD);
+  */
+
+  for (ParmVarDecl* PD : E->parameters()) {
+    EmitAutoVarDecl(PD);
+  }
+
+  EmitCompoundStmtWithoutScope(E->getBody());
+
+  Address ResultValue = ReturnValue;
+  ReturnValue = OldReturnValue;
+
+  if (hasAggregateEvaluationKind(RetTy)) {
+
+  } else {
+    return CGF.EmitLoadOfScalar(CGF.MakeAddrLValue(ResultValue, RetTy),
+                                E->getExprLoc());
+  }
+}

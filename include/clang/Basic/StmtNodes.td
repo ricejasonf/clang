@@ -93,7 +93,7 @@ def VAArgExpr : DStmt<Expr>;
 def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
 def ParametricExpressionIdExpr : DStmt<Expr>;
-def ParametricExpressionExpr : DStmt<Expr>;
+def ParametricExpressionCallExpr : DStmt<Expr>;
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;

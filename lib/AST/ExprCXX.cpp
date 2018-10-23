@@ -1451,11 +1451,11 @@ TypeTraitExpr *TypeTraitExpr::CreateDeserialized(const ASTContext &C,
 void ArrayTypeTraitExpr::anchor() {}
 
 
-ParametricExpressionExpr *ParametricExpressionExpr::Create(
-                                      ASTContext &C, SourceLocation BL,
-                                      CompoundStmt *B,
-                                      ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionExpr *New = new (C) ParametricExpressionExpr(BL, B);
+ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
+                                        ASTContext &C, SourceLocation BL,
+                                        CompoundStmt *B,
+                                        ArrayRef<ParmVarDecl *> Params) {
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(BL, B);
   New->NumParams = Params.size();
 
   if (!Params.empty()) {

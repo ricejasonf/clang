@@ -4819,11 +4819,12 @@ public:
   }
 };
 
-// ParametricExpressionExpr - A compound statement with RAII scope that
-//                            evaluates as an expression based on its
-//                            return value
+// ParametricExpressionCallExpr - A compound statement with RAII scope that
+//                                evaluates as an expression based on its
+//                                return value
 //                           
-class ParametricExpressionExpr : public Expr {
+class ParametricExpressionCallExpr : public Expr {
+  ParametricExpressionDecl *OrigDecl;
   SourceLocation BeginLoc;
   unsigned NumParams = 0;
   ParmVarDecl** ParamInfo;
@@ -4831,14 +4832,18 @@ class ParametricExpressionExpr : public Expr {
   // The CompoundStmt Body is in Children[0]
   // The Param Init Exprs are in Children[I + 1]
 
-  ParametricExpressionExpr(SourceLocation BL, CompoundStmt* B)
+  ParametricExpressionCallExpr(ParametricExpressionDecl * OD, SourceLocation BL,
+                               CompoundStmt* B)
     : Expr(ParametricExpressionExprClass, QualType(), VK_LValue, OK_Ordinary,
            false, false, false, false),
+      OrigDecl(OD),
       BeginLoc(BL) {}
 public:
-  static ParametricExpressionExpr *Create(ASTContext &C, SourceLocation BL,
-                                          CompoundStmt *B,
-                                          ArrayRef<ParmVarDecl *> Params);
+  static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
+                                              CompoundStmt *B,
+                                              ArrayRef<ParmVarDecl *> Params);
+
+  ParametricExpressionDecl getDecl() { return OrigDecl; }
 
   CompoundStmt *getBody() { return static_cast<CompoundStmt*>(Children[0]); }
 
