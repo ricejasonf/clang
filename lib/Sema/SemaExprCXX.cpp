@@ -8038,9 +8038,9 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     if (CSResult.isInvalid())
       return ExprError();
 
-    return ParametricExpressionCallExpr::Create(Context, LParenLoc,
-                                            CSResult.getAs<CompoundStmt>(),
-                                            NewParmVarDecls);
+    return ParametricExpressionCallExpr::Create(Context, D, LParenLoc,
+                                                CSResult.getAs<CompoundStmt>(),
+                                                NewParmVarDecls);
   } else {
     // Output should be an Expr at this point
     return Rebuilder.TransformExpr(static_cast<Expr*>(Output));

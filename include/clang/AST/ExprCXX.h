@@ -4832,18 +4832,18 @@ class ParametricExpressionCallExpr : public Expr {
   // The CompoundStmt Body is in Children[0]
   // The Param Init Exprs are in Children[I + 1]
 
-  ParametricExpressionCallExpr(ParametricExpressionDecl * OD, SourceLocation BL,
+  ParametricExpressionCallExpr(ParametricExpressionDecl *OD, SourceLocation BL,
                                CompoundStmt* B)
     : Expr(ParametricExpressionCallExprClass, QualType(), VK_LValue, OK_Ordinary,
            false, false, false, false),
       OrigDecl(OD),
       BeginLoc(BL) {}
 public:
-  static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
-                                              CompoundStmt *B,
+  static ParametricExpressionCallExpr *Create(ASTContext &C, ParametricExpressionDecl *OD,
+                                              SourceLocation BL, CompoundStmt *B,
                                               ArrayRef<ParmVarDecl *> Params);
 
-  ParametricExpressionDecl getDecl() { return OrigDecl; }
+  ParametricExpressionDecl *getOrigDecl() { return OrigDecl; }
 
   CompoundStmt *getBody() { return static_cast<CompoundStmt*>(Children[0]); }
 

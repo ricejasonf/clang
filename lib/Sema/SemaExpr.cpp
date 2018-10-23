@@ -2978,6 +2978,9 @@ ExprResult Sema::BuildDeclarationNameExpr(
       break;
     }
 
+    case Decl::ParametricExpression:
+      llvm_unreachable("building reference to parametric expression id");
+
     case Decl::CXXDeductionGuide:
       llvm_unreachable("building reference to deduction guide");
 
@@ -5359,7 +5362,7 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
     }
 
     if (isa<ParametricExpressionIdExpr>(Fn)) {
-      return ActOnParametricExpression(Scope, Fn, ArgExprs, LParenLoc);
+      return ActOnParametricExpressionCallExpr(Scope, Fn, ArgExprs, LParenLoc);
     }
 
     // Determine whether this is a call to an object (C++ [over.call.object]).

@@ -4682,8 +4682,8 @@ public:
   Decl *ActOnFinishParametricExpressionDecl(ParametricExpressionDecl* D, bool NeedsRAII,
                                             StmtResult CompoundStmtResult);
 
-  ExprResult ActOnParametricExpression(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
-                                       SourceLocation LParenLoc);
+  ExprResult ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
+                                               SourceLocation LParenLoc);
   ParmVarDecl *BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr);
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,

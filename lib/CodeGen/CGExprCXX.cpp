@@ -2270,6 +2270,7 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
   }
 }
 
+#if 0
 llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                           const ParametricExpressionCallExpr* E,
                                           AggValueSlot AggSlot) {
@@ -2313,3 +2314,4 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                 E->getExprLoc());
   }
 }
+#endif

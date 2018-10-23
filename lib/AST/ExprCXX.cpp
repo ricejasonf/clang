@@ -1452,10 +1452,11 @@ void ArrayTypeTraitExpr::anchor() {}
 
 
 ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
-                                        ASTContext &C, SourceLocation BL,
-                                        CompoundStmt *B,
+                                        ASTContext &C,
+                                        ParametricExpressionDecl *OD,
+                                        SourceLocation BL, CompoundStmt *B,
                                         ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(BL, B);
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(OD, BL, B);
   New->NumParams = Params.size();
 
   if (!Params.empty()) {
