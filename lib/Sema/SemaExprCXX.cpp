@@ -8048,7 +8048,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
 }
 
 // used in ActOnParametricExpression and
-// TreeTransform<Derived>::TransformParametricExpressionExpr
+// TreeTransform<Derived>::TransformParametricExpressionCallExpr
 ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr) {
   TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
       Context.getRValueReferenceType(ArgExpr->getType()));

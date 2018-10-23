@@ -1723,8 +1723,8 @@ void ASTStmtWriter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *
   Record.AddSourceLocation(E->getBeginLoc());
 }
 
-void ASTStmtWriter::VisitParametricExpressionExpr(ParametricExpressionExpr *E) {
-  llvm_unreachable("Cannot write ParametricExpressionExpr nodes");
+void ASTStmtWriter::VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *E) {
+  llvm_unreachable("Cannot write ParametricExpressionCallExpr nodes");
 }
 
 //===----------------------------------------------------------------------===//

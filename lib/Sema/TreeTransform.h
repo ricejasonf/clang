@@ -3246,10 +3246,10 @@ public:
   // Build a new parametric expression that has compound statements
   //
   // By default, just creates a new one with the given inputs
-  ExprResult RebuildParametricExpressionExpr(SourceLocation BeginLoc, 
+  ExprResult RebuildParametricExpressionCallExpr(SourceLocation BeginLoc, 
                                              CompoundStmt *Body,
                                              ArrayRef<ParmVarDecl *> Params) {
-    return ParametricExpressionExpr::Create(SemaRef.Context, BeginLoc, Body,
+    return ParametricExpressionCallExpr::Create(SemaRef.Context, BeginLoc, Body,
                                             Params);
   }
 
@@ -12801,10 +12801,10 @@ TreeTransform<Derived>::TransformParametricExpressionIdExpr(
 
 template<typename Derived>
 ExprResult
-TreeTransform<Derived>::TransformParametricExpressionExpr(
-    ParametricExpressionExpr *E) {
+TreeTransform<Derived>::TransformParametricExpressionCallExpr(
+    ParametricExpressionCallExpr *E) {
   // Not sure if there is a case for having this - JASON
-  llvm_unreachable("TransformParametricExpressionExpr implemented but not tested");
+  llvm_unreachable("TransformParametricExpressionCallExpr implemented but not tested");
 
   // Transform arguments/parameters.
   bool ArgChanged = false;
@@ -12836,7 +12836,7 @@ TreeTransform<Derived>::TransformParametricExpressionExpr(
   CompoundStmt *Body = BodyResult.getAs<CompoundStmt>();
 
   if (getDerived().AlwaysRebuild() || ArgChanged || Body != E->getBody()) {
-    return RebuildParametricExpressionExpr(E->getBeginLoc(), Body, NewParams);
+    return RebuildParametricExpressionCallExpr(E->getBeginLoc(), Body, NewParams);
   } else {
     return E;
   }

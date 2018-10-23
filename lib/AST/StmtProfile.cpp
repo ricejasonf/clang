@@ -1994,7 +1994,7 @@ void StmtProfiler::VisitParametricExpressionIdExpr(const ParametricExpressionIdE
   VisitExpr(S);
 }
 
-void StmtProfiler::VisitParametricExpressionExpr(const ParametricExpressionExpr *S) {
+void StmtProfiler::VisitParametricExpressionCallExpr(const ParametricExpressionCallExpr *S) {
   VisitExpr(S);
 }
 

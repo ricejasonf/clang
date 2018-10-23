@@ -4834,7 +4834,7 @@ class ParametricExpressionCallExpr : public Expr {
 
   ParametricExpressionCallExpr(ParametricExpressionDecl * OD, SourceLocation BL,
                                CompoundStmt* B)
-    : Expr(ParametricExpressionExprClass, QualType(), VK_LValue, OK_Ordinary,
+    : Expr(ParametricExpressionCallExprClass, QualType(), VK_LValue, OK_Ordinary,
            false, false, false, false),
       OrigDecl(OD),
       BeginLoc(BL) {}
@@ -4879,7 +4879,7 @@ public:
   SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
 
   static bool classof(const Stmt *T) {
-    return T->getStmtClass() == ParametricExpressionExprClass;
+    return T->getStmtClass() == ParametricExpressionCallExprClass;
   }
 };
 } // namespace clang
