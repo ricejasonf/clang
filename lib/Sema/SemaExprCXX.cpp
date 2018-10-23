@@ -7920,11 +7920,20 @@ class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionR
   ParamVec& PVec;
   MultiExprArg ArgExprs;
   bool ExpandingExprAlias = false;
+  QualType ResultType = {};
 
 public:
   ParametricExpressionRebuilder(Sema &SemaRef, ParamMap& PM,
                                 ParamVec& PV, MultiExprArg A)
     : Base(SemaRef), PMap(PM), PVec(PV), ArgExprs(A) {}
+
+  QualType getResultType() {
+    if (ResultType.isNull()) {
+      return SemaRef.Context.VoidTy;
+    } else {
+      return ResultType;
+    }
+  }
 
   bool AlwaysRebuild() {
     return  ExpandingExprAlias || Base::AlwaysRebuild();
@@ -7972,6 +7981,41 @@ public:
     }
     
     return Base::TransformDeclRefExpr(E);
+  }
+
+  StmtResult TransformReturnStmt(ReturnStmt *S) {
+    ExprResult Result = getDerived().TransformExpr(S->getRetValue());
+
+    if (Result.isInvalid())
+      return StmtError();
+
+    if (isa<InitListExpr>(Result.get())) {
+      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_return_init_list);
+      return StmtError();
+    }
+
+    Result = getSema().ActOnFinishFullExpr(Result.get());
+
+    if (Result.isInvalid())
+      return StmtError();
+
+    QualType CurrentResultType = Result.get()->getType();
+
+    if (ResultType.isNull()) {
+      ResultType = CurrentResultType;
+    } if (ResultType != CurrentResultType) {
+      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_different_deductions)
+        << 1 // is decltype(auto)
+        << CurrentResultType << ResultType;
+    }
+
+    return new (getSema().Context) ReturnStmt(S->getReturnLoc(), Result.get(), nullptr);
+  }
+
+  ExprResult TransformParametricExpressionCallExpr(ParametricExpressionCallExpr *E) {
+    // These don't get created until the decl and the
+    // args are non-dependent so this should never happen
+    llvm_unreachable("Transforming nested ParametricExpressionCallExpr");
   }
 };
 }
@@ -8034,13 +8078,19 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   ParametricExpressionRebuilder Rebuilder(*this, ParamMap, NewParmVarDecls, ArgExprs);
 
   if (CompoundStmt::classof(Output)) {
+    DeclContext *SavedContext = CurContext;
+    CurContext = D;
     StmtResult CSResult = Rebuilder.TransformStmt(Output);
+    CurContext = SavedContext;
+
     if (CSResult.isInvalid())
       return ExprError();
 
-    return ParametricExpressionCallExpr::Create(Context, D, LParenLoc,
-                                                CSResult.getAs<CompoundStmt>(),
-                                                NewParmVarDecls);
+    Expr* E = ParametricExpressionCallExpr::Create(Context, D, LParenLoc,
+                                                   CSResult.getAs<CompoundStmt>(),
+                                                   NewParmVarDecls);
+    E->setType(Rebuilder.getResultType().getNonReferenceType());
+    return E;
   } else {
     // Output should be an Expr at this point
     return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
