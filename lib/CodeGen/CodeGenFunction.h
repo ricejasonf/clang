@@ -3956,6 +3956,10 @@ public:
 
   RValue EmitAtomicExpr(AtomicExpr *E);
 
+  llvm::Value *EmitParametricExpressionCallExpr(
+                                          const ParametricExpressionCallExpr* E,
+                                          AggValueSlot AggSlot);
+
   //===--------------------------------------------------------------------===//
   //                         Annotations Emission
   //===--------------------------------------------------------------------===//

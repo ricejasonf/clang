@@ -8086,10 +8086,12 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     if (CSResult.isInvalid())
       return ExprError();
 
+    ExprValueKind VK = Rebuilder.getResultType()->isReferenceType() ? VK_LValue :
+                                                                      VK_RValue;
+    QualType T = Rebuilder.getResultType().getNonReferenceType();
     Expr* E = ParametricExpressionCallExpr::Create(Context, D, LParenLoc,
                                                    CSResult.getAs<CompoundStmt>(),
-                                                   NewParmVarDecls);
-    E->setType(Rebuilder.getResultType().getNonReferenceType());
+                                                   T, VK, NewParmVarDecls);
     return E;
   } else {
     // Output should be an Expr at this point

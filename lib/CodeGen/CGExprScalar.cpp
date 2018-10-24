@@ -780,6 +780,10 @@ public:
   }
   Value *VisitAsTypeExpr(AsTypeExpr *CE);
   Value *VisitAtomicExpr(AtomicExpr *AE);
+
+  Value *VisitParametricExpressionCallExpr(ParametricExpressionCallExpr* E) {
+    // TODO call EmitParametricExpressionCallExpr or something
+  }
 };
 }  // end anonymous namespace.
 

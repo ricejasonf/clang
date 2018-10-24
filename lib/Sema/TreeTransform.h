@@ -3248,10 +3248,11 @@ public:
   // By default, just creates a new one with the given inputs
   ExprResult RebuildParametricExpressionCallExpr(SourceLocation BeginLoc, 
                                                  ParametricExpressionDecl *OD,
-                                                 CompoundStmt *Body,
+                                                 CompoundStmt *Body, QualType QT,
+                                                 ExprValueKind VK,
                                                  ArrayRef<ParmVarDecl *> Params) {
     return ParametricExpressionCallExpr::Create(SemaRef.Context, OD, BeginLoc, Body,
-                                                Params);
+                                                QT, VK, Params);
   }
 
 private:
@@ -12838,7 +12839,8 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
 
   if (getDerived().AlwaysRebuild() || ArgChanged || Body != E->getBody()) {
     return RebuildParametricExpressionCallExpr(E->getBeginLoc(), E->getOrigDecl(),
-                                               Body, NewParams);
+                                               Body, E->getType(),
+                                               E->getValueKind(), NewParams);
   } else {
     return E;
   }

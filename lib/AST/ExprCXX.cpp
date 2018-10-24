@@ -1455,8 +1455,9 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
                                         ASTContext &C,
                                         ParametricExpressionDecl *OD,
                                         SourceLocation BL, CompoundStmt *B,
+                                        QualType QT, ExprValueKind VK,
                                         ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(OD, BL, B);
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(OD, BL, B, QT, VK);
   New->NumParams = Params.size();
 
   if (!Params.empty()) {

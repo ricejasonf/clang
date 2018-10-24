@@ -2270,22 +2270,24 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
   }
 }
 
-#if 0
 llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                           const ParametricExpressionCallExpr* E,
                                           AggValueSlot AggSlot) {
+  // TODO make RAII object to handle ReturnValue, NumReturnExprs, et al.
   Address OldReturnValue = ReturnValue;
 
   QualType RetTy = E->getType();
   CompoundStmt *Body = E->getBody();
-  PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body.getBeginLoc(),
+  /*
+  PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body->getBeginLoc(),
                              "LLVM IR generation of parametric expression call ('{}')");
+  */
 
-  LexicalScope Scope(*this, Body.getSourceRange());
+  LexicalScope Scope(*this, Body->getSourceRange());
 
   if (hasAggregateEvaluationKind(RetTy)) {
     // This is a naive guess on how we can just
-    // write to the AggSlot from the ReturnStmt
+    // write to the AggSlot from EmitReturnStmt
     ReturnValue = AggSlot.getAddress();
   } else {
     ReturnValue = CreateIRTemp(RetTy, "retval");
@@ -2299,19 +2301,19 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   */
 
   for (ParmVarDecl* PD : E->parameters()) {
-    EmitAutoVarDecl(PD);
+    EmitAutoVarDecl(*PD);
   }
 
-  EmitCompoundStmtWithoutScope(E->getBody());
+  EmitCompoundStmtWithoutScope(*Body);
 
   Address ResultValue = ReturnValue;
   ReturnValue = OldReturnValue;
 
   if (hasAggregateEvaluationKind(RetTy)) {
-
+    // ReturnStmt did the work already
+    return nullptr;
   } else {
-    return CGF.EmitLoadOfScalar(CGF.MakeAddrLValue(ResultValue, RetTy),
-                                E->getExprLoc());
+    return EmitLoadOfScalar(MakeAddrLValue(ResultValue, RetTy),
+                            E->getBeginLoc());
   }
 }
-#endif
