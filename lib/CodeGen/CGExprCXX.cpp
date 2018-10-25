@@ -2281,6 +2281,7 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   unsigned OldNumSimpleReturnExprs = NumSimpleReturnExprs;
   NumReturnExprs = 0;
   NumSimpleReturnExprs = 0;
+  JumpDest OldReturnBlock = ReturnBlock;
 
   QualType RetTy = E->getType();
   CompoundStmt *Body = E->getBody();
@@ -2290,34 +2291,29 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   */
 
   LexicalScope Scope(*this, Body->getSourceRange());
+  ReturnBlock = getJumpDestInCurrentScope("pe.return");
 
   if (hasAggregateEvaluationKind(RetTy)) {
     // This is a naive guess on how we can just
     // write to the AggSlot from EmitReturnStmt
     ReturnValue = AggSlot.getAddress();
   } else {
-    ReturnValue = CreateIRTemp(RetTy, "retval");
+    ReturnValue = CreateMemTemp(RetTy);
   }
-
-  // TODO not sure if this is needed
-  //      Also we don't store the decl of the callee
-  /*
-  GlobalDecl GD(E->getCalleeDecl());
-  ApplyInlineDebugLocation DebugScope(*this, GD);
-  */
 
   for (ParmVarDecl* PD : E->parameters()) {
     EmitAutoVarDecl(*PD);
   }
 
-  EnsureInsertPoint();
   EmitCompoundStmtWithoutScope(*Body);
+  EmitReturnBlock();
 
   CurCodeDecl = OldCurCodeDecl;
   Address ResultValue = ReturnValue;
   ReturnValue = OldReturnValue;
   NumReturnExprs = OldNumReturnExprs;
   NumSimpleReturnExprs = OldNumSimpleReturnExprs;
+  ReturnBlock = OldReturnBlock;
 
   if (hasAggregateEvaluationKind(RetTy)) {
     // ReturnStmt did the work already

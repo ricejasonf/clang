@@ -8102,8 +8102,14 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
 // used in ActOnParametricExpression and
 // TreeTransform<Derived>::TransformParametricExpressionCallExpr
 ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr) {
-  TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(
-      Context.getRValueReferenceType(ArgExpr->getType()));
+  QualType ArgTy;
+  // not sure if we should include XValue here
+  if (ArgExpr->isRValue()) {
+    ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
+  } else {
+    ArgTy = Context.getLValueReferenceType(ArgExpr->getType());
+  }
+  TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(ArgTy);
   ParmVarDecl *New = ParmVarDecl::Create(Context,
                                          OldParam->getDeclContext(),
                                          OldParam->getInnerLocStart(),
