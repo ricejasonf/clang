@@ -8115,7 +8115,7 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *A
   ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
   if (InitExprResult.isInvalid())
     return nullptr;
-  New->setInit(InitExprResult.get());
+  AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
   return New;
 }
 

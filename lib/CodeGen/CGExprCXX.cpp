@@ -2274,7 +2274,13 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                           const ParametricExpressionCallExpr* E,
                                           AggValueSlot AggSlot) {
   // TODO make RAII object to handle ReturnValue, NumReturnExprs, et al.
+  const Decl *OldCurCodeDecl = CurCodeDecl;
+  CurCodeDecl = E->getOrigDecl();
   Address OldReturnValue = ReturnValue;
+  unsigned OldNumReturnExprs = NumReturnExprs;
+  unsigned OldNumSimpleReturnExprs = NumSimpleReturnExprs;
+  NumReturnExprs = 0;
+  NumSimpleReturnExprs = 0;
 
   QualType RetTy = E->getType();
   CompoundStmt *Body = E->getBody();
@@ -2304,10 +2310,14 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
     EmitAutoVarDecl(*PD);
   }
 
+  EnsureInsertPoint();
   EmitCompoundStmtWithoutScope(*Body);
 
+  CurCodeDecl = OldCurCodeDecl;
   Address ResultValue = ReturnValue;
   ReturnValue = OldReturnValue;
+  NumReturnExprs = OldNumReturnExprs;
+  NumSimpleReturnExprs = OldNumSimpleReturnExprs;
 
   if (hasAggregateEvaluationKind(RetTy)) {
     // ReturnStmt did the work already

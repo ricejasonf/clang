@@ -3958,7 +3958,8 @@ public:
 
   llvm::Value *EmitParametricExpressionCallExpr(
                                           const ParametricExpressionCallExpr* E,
-                                          AggValueSlot AggSlot);
+                                          AggValueSlot AggSlot = 
+                                                AggValueSlot::ignored());
 
   //===--------------------------------------------------------------------===//
   //                         Annotations Emission

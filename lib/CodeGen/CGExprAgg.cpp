@@ -200,7 +200,7 @@ public:
   }
 
   void VisitParametricExpressionCallExpr(ParametricExpressionCallExpr* E) {
-    // TODO call EmitParametricExpressionCallExpr or something
+    CGF.EmitParametricExpressionCallExpr(E, Dest);
   }
 };
 }  // end anonymous namespace.

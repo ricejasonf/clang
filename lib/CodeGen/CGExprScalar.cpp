@@ -782,7 +782,7 @@ public:
   Value *VisitAtomicExpr(AtomicExpr *AE);
 
   Value *VisitParametricExpressionCallExpr(ParametricExpressionCallExpr* E) {
-    // TODO call EmitParametricExpressionCallExpr or something
+    return CGF.EmitParametricExpressionCallExpr(E);
   }
 };
 }  // end anonymous namespace.
