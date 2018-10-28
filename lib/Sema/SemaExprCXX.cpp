@@ -7915,31 +7915,34 @@ namespace {
 class RebuildExpressionDeclContext
   : public RecursiveASTVisitor<RebuildExpressionDeclContext> {
 public:
-  using TransformedLocalDeclsFn = llvm::function_ref<void(Decl*, Decl*)>;
+  using TransformedLocalDeclFn = llvm::function_ref<void(Decl*, Decl*)>;
 
 private:
   // We are using a type erased function to use this with
   // multiple rebuilder types
-  TransformedLocalDeclsFn transformedLocalDecls;
+  TransformedLocalDeclFn transformedLocalDecl;
   Sema &S;
   DeclContext* OrigCtx;
 
-  explicit RebuildExpressionDeclContext(TransformedLocalDeclsFn TFn, Sema &S, DeclContext *O)
-    : transformedLocalDecls(TFn), S(S), OrigCtx(O) {}
+  explicit RebuildExpressionDeclContext(TransformedLocalDeclFn TFn, Sema &S, DeclContext *O)
+    : transformedLocalDecl(TFn), S(S), OrigCtx(O) {}
 public:
   template <typename Transform>
   static bool Traverse(Transform &T, DeclContext *O, Stmt *St) {
-    auto TFn = [&T](Decl *A, Decl *B) { T.transformedLocalDecls(A, B); };
-    RebuildExpressionDeclContext(TFn, T.getSema(), O);
-    return RebuildExpressionDeclContext.TraverseStmt(St);
+    auto TFn = [&T](Decl *A, Decl *B) { T.transformedLocalDecl(A, B); };
+    RebuildExpressionDeclContext R(TFn, T.getSema(), O);
+    return R.TraverseStmt(St);
   }
 
   bool VisitVarDecl(VarDecl *VD) {
     if (VD->getDeclContext() == OrigCtx) {
-      // can you just copy these??
-      VarDecl *NewVD = new (S.Context) VarDecl(VD);
-      NewVD->setDeclContext(S.CurContext);
-      transformedLocalDecls(VD, NewVD);
+      VarDecl *NewVD = VarDecl::Create(S.Context, S.CurContext,
+                                       VD->getInnerLocStart(),
+                                       VD->getLocation(),
+                                       VD->getIdentifier(),
+                                       VD->getType(), VD->getTypeSourceInfo(),
+                                       VD->getStorageClass());
+      transformedLocalDecl(VD, NewVD);
     }
     return false;
   }
@@ -7948,10 +7951,11 @@ public:
 // This is used to substitute an expression in a new context
 // via `using` parameters
 class ExpressionContextRebuilder : public TreeTransform<ExpressionContextRebuilder> {
+  using Base = TreeTransform<ExpressionContextRebuilder>;
   DeclContext *OldContext;
 
   ExpressionContextRebuilder(Sema& S, DeclContext *OldContext)
-    : SemaRef(S), OldContext(OldContext) {}
+    : Base(S), OldContext(OldContext) {}
 
 public:
   static ExprResult Transform(Sema& S, DeclContext *O, Expr* E) {
@@ -7969,20 +7973,30 @@ public:
   // DeclRefs.
   ExprResult TransformParametricExpressionCallExpr(ParametricExpressionCallExpr *E) {
     // Transform all the ParmVarDecls
-    llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls(E->getNumParams());
+    llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls{};
     for (ParmVarDecl* PD : E->parameters()) {
-      Expr* NewInit = TransformExpr(PD->getInit());
-      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(PD, NewInit);
-      transformedLocalDecls(PD, NewPD);
-      NewParmVarDecls.push_back(NewPd);
+      Expr *OldInit = PD->getInit();
+      assert(OldInit && "ParmVarDecl getInit returned nullptr");
+      ExprResult NewInit = TransformExpr(OldInit);
+      if (NewInit.isInvalid())
+        return ExprError();
+
+      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(PD, NewInit.get());
+      if (!NewPD) {
+        return ExprError();
+      }
+
+      transformedLocalDecl(PD, NewPD);
+      NewParmVarDecls.push_back(NewPD);
     }
 
     // Transform the Body
-    ExprResult CSResult = getDerived().TransformStmt(E->getBody());
+    StmtResult CSResult = getDerived().TransformStmt(E->getBody());
     if (CSResult.isInvalid())
       return ExprError();
 
     return ParametricExpressionCallExpr::Create(getSema().Context,
+                                                E->getOrigDecl(),
                                                 E->getBeginLoc(),
                                                 CSResult.getAs<CompoundStmt>(),
                                                 E->getType(),
@@ -7997,7 +8011,7 @@ class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionR
   using ParamMap = llvm::SmallDenseMap<ParmVarDecl*, unsigned>;
   // ParamMap maps to index of ParmVec or MultiExprArg
 
-  DeclContext OrigDeclContext;
+  DeclContext* OrigDeclContext;
   ParamMap& PMap;
   ParamVec& PVec;
   MultiExprArg ArgExprs;
@@ -8063,8 +8077,6 @@ public:
   }
 
   StmtResult TransformReturnStmt(ReturnStmt *S) {
-    if (ExpandingAliasExpr) return S;
-
     ExprResult Result = getDerived().TransformExpr(S->getRetValue());
 
     if (Result.isInvalid())
@@ -8153,11 +8165,12 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     }
   }
 
-  ParametricExpressionRebuilder Rebuilder(*this, ParamMap, NewParmVarDecls, ArgExprs);
+  ParametricExpressionRebuilder Rebuilder(*this, D->getDeclContext(), ParamMap,
+                                          NewParmVarDecls, ArgExprs);
 
   if (CompoundStmt::classof(Output)) {
     RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
-    StmtResult CSResult = TransformStmt(Output);
+    StmtResult CSResult = Rebuilder.TransformStmt(Output);
 
     if (CSResult.isInvalid())
       return ExprError();
@@ -8171,7 +8184,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   } else {
     // Output should be an Expr at this point
     RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
-    return TransformExpr(static_cast<Expr*>(Output));
+    return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
   }
 }
 
