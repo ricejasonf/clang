@@ -2699,6 +2699,10 @@ bool Sema::UseArgumentDependentLookup(const CXXScopeSpec &SS,
         return false;
     } else if (!isa<FunctionTemplateDecl>(D))
       return false;
+
+    if (isa<ParametricExpressionDecl>(D)) {
+      return false;
+    }
   }
 
   return true;
