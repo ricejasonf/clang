@@ -10570,12 +10570,8 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
     return nullptr;
   }
 
-  // TInfo is just a dummy since parametric expression
-  // declarators do not actually name a type
-  TypeSourceInfo *TInfo = Context.CreateTypeSourceInfo(Context.DependentTy);
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
-                                                                   NameInfo, UsingLoc,
-                                                                   TInfo);
+                                                                   NameInfo, UsingLoc);
 
   if (New) {
     PushOnScopeChains(New, S);

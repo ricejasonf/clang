@@ -2916,10 +2916,9 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
 ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
                             const DeclarationNameInfo &DN,
-                            SourceLocation StartL,
-                            TypeSourceInfo *TInfo) {
+                            SourceLocation StartL) {
   ParametricExpressionDecl *New =
-      new (C, DC) ParametricExpressionDecl(C, DC, DN, StartL, TInfo);
+      new (C, DC) ParametricExpressionDecl(DC, DN, StartL);
   return New;
 }
 

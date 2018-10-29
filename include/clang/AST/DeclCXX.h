@@ -3947,24 +3947,32 @@ const PartialDiagnostic &operator<<(const PartialDiagnostic &DB,
                                     AccessSpecifier AS);
 
 // ParametricExpressionDecl
-class ParametricExpressionDecl : public FunctionDecl {
+class ParametricExpressionDecl : public NamedDecl,
+                                 public DeclContext {
+  Stmt *Body = nullptr;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
 
 protected:
-  ParametricExpressionDecl(ASTContext &C, DeclContext *DC, const DeclarationNameInfo &DN,
-                           SourceLocation StartL, TypeSourceInfo* TInfo)
-    : FunctionDecl(ParametricExpression, C, DC, StartL, DN, C.DependentTy, TInfo,
-                   SC_None, false, false)
-      {}
+  ParametricExpressionDecl(DeclContext *DC, const DeclarationNameInfo &DN,
+                           SourceLocation StartL)
+    : NamedDecl(ParametricExpression, DC, StartL, DN.getName())
+    , DeclContext(ParametricExpression) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           const DeclarationNameInfo &DN,
-                                          SourceLocation StartL,
-                                          TypeSourceInfo* TInfo);
+                                          SourceLocation StartL);
   bool hasLinkage() {
     return false;
+  }
+
+  void setBody(Stmt *S) {
+    Body = S;
+  }
+
+  Stmt* getBody() const {
+    return Body;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);

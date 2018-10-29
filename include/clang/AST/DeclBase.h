@@ -1819,6 +1819,7 @@ public:
     case Decl::Block:
     case Decl::Captured:
     case Decl::ObjCMethod:
+    case Decl::ParametricExpression:
       return true;
     default:
       return getDeclKind() >= Decl::firstFunction &&

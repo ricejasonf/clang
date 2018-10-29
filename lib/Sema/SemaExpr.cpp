@@ -2982,9 +2982,6 @@ ExprResult Sema::BuildDeclarationNameExpr(
       break;
     }
 
-    case Decl::ParametricExpression:
-      llvm_unreachable("building reference to parametric expression id");
-
     case Decl::CXXDeductionGuide:
       llvm_unreachable("building reference to deduction guide");
 

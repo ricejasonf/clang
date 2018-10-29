@@ -1041,6 +1041,12 @@ Corrected:
     return NameClassification::Error();
   }
 
+  if (NextToken.is(tok::l_paren) &&
+      Result.getAsSingle<ParametricExpressionDecl>()) {
+    return ExprResult(new (Context) ParametricExpressionIdExpr(NameLoc,
+        Result.getAsSingle<ParametricExpressionDecl>()));
+  }
+
   if (getLangOpts().CPlusPlus && NextToken.is(tok::less) &&
       (IsFilteredTemplateName || hasAnyAcceptableTemplateNames(Result))) {
     // C++ [temp.names]p3:
