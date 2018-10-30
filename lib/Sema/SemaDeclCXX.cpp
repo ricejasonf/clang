@@ -10534,7 +10534,7 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 }
 
 ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
-                                          Scope *S, Scope *BodyScope,
+                                          Scope *S, Scope *BodyScope, AccessSpecifier AS,
                                           SourceLocation UsingLoc, bool &NeedsRAII,
                                           MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                           Declarator &ParametricExpressionDeclarator) {
@@ -10574,6 +10574,7 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
                                                                    NameInfo, UsingLoc);
 
   if (New) {
+    New->setAccess(AS);
     PushOnScopeChains(New, S);
   }
 

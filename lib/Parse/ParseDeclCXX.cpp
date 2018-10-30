@@ -893,7 +893,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                              Scope::CompoundStmtScope);
   ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
-                                                   S, getCurScope(), UsingLoc, NeedsRAII,
+                                                   S, getCurScope(), AS, UsingLoc, NeedsRAII,
                                                    ParamInfo, ParametricExpressionDeclarator);
   StmtResult CSResult = ParseCompoundStatement();
   Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New, NeedsRAII, CSResult);

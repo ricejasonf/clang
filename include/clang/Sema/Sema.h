@@ -4674,9 +4674,8 @@ public:
                               TypeResult Type, Decl *DeclFromDeclSpec);
 
   ParametricExpressionDecl *ActOnParametricExpressionDecl(
-                                      Scope *S, Scope *BodyScope,
-                                      SourceLocation UsingLoc,
-                                      bool &NeedsRAII,
+                                      Scope *S, Scope *BodyScope, AccessSpecifier AS,
+                                      SourceLocation UsingLoc, bool &NeedsRAII,
                                       MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
                                       Declarator &ParametricExpressionDeclarator);
   Decl *ActOnFinishParametricExpressionDecl(ParametricExpressionDecl* D, bool NeedsRAII,
