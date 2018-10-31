@@ -2554,9 +2554,14 @@ Decl *TemplateDeclInstantiator::VisitConstructorUsingShadowDecl(
   return nullptr;
 }
 
-Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(ParametricExpressionDecl *D) {
-  // TODO JASON
-  return D;
+Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
+                                              ParametricExpressionDecl *D) {
+  // Just clone the Decl with the new DeclContext
+  // The params and body get transformed at the site of invocation
+  ParametricExpressionDecl *New = ParametricExpressionDecl::Create(SemaRef.Context,
+                                                                   Owner, D);
+  Owner->addDecl(New);
+  return New;
 }
 
 template <typename T>

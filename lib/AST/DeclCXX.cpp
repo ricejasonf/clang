@@ -2915,10 +2915,25 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
 
 ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
-                            const DeclarationNameInfo &DN,
+                            DeclarationName DN,
                             SourceLocation StartL) {
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, DN, StartL);
+  return New;
+}
+
+// This is for cloning with a new DeclContext for use in
+// template instantiations. Transform happens at invocation.
+ParametricExpressionDecl *ParametricExpressionDecl::Create(
+                            ASTContext &C, DeclContext *DC,
+                            ParametricExpressionDecl *Old) {
+  ParametricExpressionDecl *New =
+      new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
+                                           Old->getBeginLoc());
+  New->Body = Old->Body;
+  New->ParamInfo = Old->ParamInfo;
+  New->NumParams = Old->NumParams;
+  New->setAccess(Old->getAccess());
   return New;
 }
 

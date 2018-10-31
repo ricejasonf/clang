@@ -10571,7 +10571,8 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
   }
 
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
-                                                                   NameInfo, UsingLoc);
+                                                                   NameInfo.getName(),
+                                                                   UsingLoc);
 
   if (New) {
     New->setAccess(AS);

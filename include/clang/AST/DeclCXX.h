@@ -3953,19 +3953,18 @@ class ParametricExpressionDecl : public NamedDecl,
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
 
-protected:
-  ParametricExpressionDecl(DeclContext *DC, const DeclarationNameInfo &DN,
+  ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
                            SourceLocation StartL)
-    : NamedDecl(ParametricExpression, DC, StartL, DN.getName())
+    : NamedDecl(ParametricExpression, DC, StartL, DN)
     , DeclContext(ParametricExpression) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
-                                          const DeclarationNameInfo &DN,
+                                          DeclarationName DN,
                                           SourceLocation StartL);
-  bool hasLinkage() {
-    return false;
-  }
+
+  static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
+                                          ParametricExpressionDecl* Old);
 
   void setBody(Stmt *S) {
     Body = S;

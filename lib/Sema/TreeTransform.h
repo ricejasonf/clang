@@ -12805,45 +12805,49 @@ template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformParametricExpressionCallExpr(
     ParametricExpressionCallExpr *E) {
-  // Not sure if there is a case for having this - JASON
-  llvm_unreachable("TransformParametricExpressionCallExpr implemented but not tested");
+  // Transform all the ParmVarDecls
 
-  // Transform arguments/parameters.
-  bool ArgChanged = false;
-  SmallVector<ParmVarDecl*, 8> NewParams(E->getNumParams());
-  for (ParmVarDecl *OldParam : E->parameters()) {
-    ParmVarDecl *NewParam;
-    ExprResult R = getDerived().TransformExpr(OldParam->getInit());
-    if (R.isInvalid())
+  bool ParamChanged = false;
+  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls{};
+  for (ParmVarDecl* PD : E->parameters()) {
+    ExprResult NewInit = getDerived().TransformExpr(PD->getInit());
+    if (NewInit.isInvalid())
       return ExprError();
-    if (R.get() != OldParam->getInit()) {
-      // Rebuild the ParmVarDecl
-      NewParam = getSema().BuildParametricExpressionParam(OldParam, R.get());
-      ArgChanged = true;
-    }
-    else {
-      NewParam = OldParam;
-    }
 
-    NewParams.push_back(NewParam);
+    if (getDerived().AlwaysRebuild() ||
+        PD->getDeclContext() != getSema().CurContext ||
+        NewInit.get() != PD->getInit()
+    ) {
+      ParamChanged = true;
+      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(PD, NewInit.get());
+      if (!NewPD) {
+        return ExprError();
+      }
+      getDerived().transformedLocalDecl(PD, NewPD);
+      NewParmVarDecls.push_back(NewPD);
+    } else {
+      NewParmVarDecls.push_back(PD);
+    }
   }
 
-  // Transform body
-  // We aren't handling the possibility that this would do the
-  // RAII scope elision thing, but it is moot at this point
-  StmtResult BodyResult = TransformCompoundStmt(E->getBody());
-  if (BodyResult.isInvalid())
+  // Transform the Body
+
+  StmtResult CSResult = getDerived().TransformStmt(E->getBody());
+  if (CSResult.isInvalid())
     return ExprError();
 
-  CompoundStmt *Body = BodyResult.getAs<CompoundStmt>();
-
-  if (getDerived().AlwaysRebuild() || ArgChanged || Body != E->getBody()) {
-    return RebuildParametricExpressionCallExpr(E->getBeginLoc(), E->getOrigDecl(),
-                                               Body, E->getType(),
-                                               E->getValueKind(), NewParams);
-  } else {
+  if (!getDerived().AlwaysRebuild() && !ParamChanged &&
+      CSResult.get() == E->getBody()) {
     return E;
   }
+
+  return ParametricExpressionCallExpr::Create(getSema().Context,
+                                              E->getOrigDecl(),
+                                              E->getBeginLoc(),
+                                              CSResult.getAs<CompoundStmt>(),
+                                              E->getType(),
+                                              E->getValueKind(),
+                                              NewParmVarDecls);
 }
 
 } // end namespace clang

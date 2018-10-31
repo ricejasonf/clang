@@ -7965,44 +7965,6 @@ public:
   }
 
   bool AlwaysRebuild() { return true; }
-
-  // Normally ParametricExpressionCallExpr is built once its inputs are
-  // non-dependent, but it still needs to be transformed when it is part
-  // of an argument for a `using` parameter. It's params and vars need
-  // to be built in the new DeclContext along with transforming corresponding
-  // DeclRefs.
-  ExprResult TransformParametricExpressionCallExpr(ParametricExpressionCallExpr *E) {
-    // Transform all the ParmVarDecls
-    llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls{};
-    for (ParmVarDecl* PD : E->parameters()) {
-      Expr *OldInit = PD->getInit();
-      assert(OldInit && "ParmVarDecl getInit returned nullptr");
-      ExprResult NewInit = TransformExpr(OldInit);
-      if (NewInit.isInvalid())
-        return ExprError();
-
-      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(PD, NewInit.get());
-      if (!NewPD) {
-        return ExprError();
-      }
-
-      transformedLocalDecl(PD, NewPD);
-      NewParmVarDecls.push_back(NewPD);
-    }
-
-    // Transform the Body
-    StmtResult CSResult = getDerived().TransformStmt(E->getBody());
-    if (CSResult.isInvalid())
-      return ExprError();
-
-    return ParametricExpressionCallExpr::Create(getSema().Context,
-                                                E->getOrigDecl(),
-                                                E->getBeginLoc(),
-                                                CSResult.getAs<CompoundStmt>(),
-                                                E->getType(),
-                                                E->getValueKind(),
-                                                NewParmVarDecls);
-  }
 };
 
 class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {

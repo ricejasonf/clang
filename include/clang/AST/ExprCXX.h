@@ -4833,7 +4833,7 @@ class ParametricExpressionCallExpr : public Expr {
   // The Param Init Exprs are in Children[I + 1]
 
   ParametricExpressionCallExpr(ParametricExpressionDecl *OD, SourceLocation BL,
-                               CompoundStmt* B, QualType QT, ExprValueKind VK)
+                               CompoundStmt *B, QualType QT, ExprValueKind VK)
     : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
            false, false, false, false),
       OrigDecl(OD),
@@ -4846,7 +4846,13 @@ public:
 
   ParametricExpressionDecl *getOrigDecl() const { return OrigDecl; }
 
-  CompoundStmt *getBody() const { return static_cast<CompoundStmt*>(Children[0]); }
+  CompoundStmt *getBody() const {
+    return static_cast<CompoundStmt*>(Children[0]);
+  }
+
+  void setBody(CompoundStmt *Body) {
+    Children[0] = Body;
+  }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
   unsigned getNumParams() const { return NumParams; }
