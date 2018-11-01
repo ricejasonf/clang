@@ -4964,7 +4964,6 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     switch (D.getContext()) {
     case DeclaratorContext::PrototypeContext:
     case DeclaratorContext::LambdaExprParameterContext:
-    case DeclaratorContext::ParametricExpressionParameterContext: // JASON - I don't think this is right
       // C++0x [dcl.fct]p13:
       //   [...] When it is part of a parameter-declaration-clause, the
       //   parameter pack is a function parameter pack (14.5.3). The type T
@@ -4983,6 +4982,20 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
         T = Context.getPackExpansionType(T, None);
       }
       break;
+    case DeclaratorContext::ParametricExpressionParameterContext: {
+      // FIXME: This is a hack. Is there way to create a parameter
+      //        pack of something like DependentTy?
+      TemplateTypeParmDecl *DummyTemplateParam =
+          TemplateTypeParmDecl::Create(
+              S.Context, S.Context.getTranslationUnitDecl(),
+              /*KeyLoc*/ SourceLocation(), /*NameLoc*/ D.getBeginLoc(),
+              /*TemplateParameterDepth*/ 0, /*AutoParameterPosition*/ 0,
+              /*Identifier*/ nullptr, false, /*IsParameterPack*/ true);
+      T = Context.getPackExpansionType(
+                          QualType(DummyTemplateParam->getTypeForDecl(), 0),
+                          None);
+      break;
+    }
     case DeclaratorContext::TemplateParamContext:
       // C++0x [temp.param]p15:
       //   If a template-parameter is a [...] is a parameter-declaration that
@@ -5037,7 +5050,8 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
   }
 
   // Validate parametric expression param
-  if (D.getContext() == DeclaratorContext::ParametricExpressionParameterContext) {
+  if (D.getContext() == DeclaratorContext::ParametricExpressionParameterContext &&
+      !D.hasEllipsis()) {
     // This might not be the correct place to check these
     if (T.hasLocalQualifiers() || T->isReferenceType() || T->isPointerType()) {
       S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);

@@ -8019,7 +8019,7 @@ public:
           return FunctionParmPackExpr::Create(getSema().Context, E->getType(),
                                               OP, E->getExprLoc(),
                                               ArrayRef<ParmVarDecl*>(&(PVec[PMapItr->second]),
-                                              PackSize));
+                                                                     PackSize));
         }
       } else {
         if (OP->isUsingSpecified()) {
@@ -8089,7 +8089,8 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
 
   // If PackSize is negative then there must not be a param pack
   // Or the user gave us an invalid arity
-  if ((PackCount == 1 && PackSize < 0) || (ArgExprs.size() != D->getNumParams())) {
+  if ((PackCount == 1 && PackSize < 0) ||
+      (PackCount == 0 && ArgExprs.size() != D->getNumParams())) {
     Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
       << (((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0);
     // TODO note the declaration
