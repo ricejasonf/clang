@@ -8070,6 +8070,61 @@ public:
   }
 
 };
+
+// This is used to deduce the return type for parametric expressions.
+// Perhaps this is overkill.
+class ParametricExpressionReturnStmtVisitor
+  : public RecursiveASTVisitor<ParametricExpressionReturnStmtVisitor> {
+
+  Sema &SemaRef;
+  QualType ResultType;
+
+public:
+  ParametricExpressionReturnStmtVisitor(Sema &S)
+    : SemaRef(S), ResultType(S.Context.DependentTy) {}
+
+  QualType getResultType() {
+    return ResultType;
+  }
+
+  VisitParametricExpressionReturnStmt(ParametricExpressionReturnStmt *RS) {
+    if (RS->isUnreachable())
+      return true;;
+
+    Expr *RE = RS->getRetValue();
+    QualType CurrentResultType();
+    if (RE) {
+      CurrentResultType = RS->getRetValue()->getType();
+    } else {
+      CurrentResultType = SemaRef.Context.VoidTy;
+    }
+
+    if (ResultType.isNull() || ResultType.isDependendentType()) {
+      ResultType = CurrentResultType;
+    } else if (
+        getSema().Context.getCanonicalType(ResultType)
+     != getSema().Context.getCanonicalType(CurrentResultType)) {
+      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_different_deductions)
+        << 1 // decltype(auto)
+        << CurrentResultType << ResultType;
+    }
+
+    return true;
+  }
+
+  // Don't visit enclosed scopes
+
+  VisitLambdaExpr(LambdaExpr *) {
+    return true;
+  }
+
+  VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
+    return true;
+  }
+
+  VisitReturnStmt(ReturnStmt *) {
+    llvm_unreachable("ParametricExpressionReturnStmtVisitor in invalid scope");
+  }
 }
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
@@ -8128,6 +8183,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     }
   }
 
+  // TODO use a TemplateInstantiator here or SubstStmt and SubstExpr or something
   ParametricExpressionRebuilder Rebuilder(*this, D->getDeclContext(), ParamMap,
                                           NewParmVarDecls, ArgExprs);
 
@@ -8149,6 +8205,19 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
     return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
   }
+}
+
+ExprResult BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
+                                             CompoundStmt *Body,
+                                             ArrayRef<ParmVarDecl *> Params) {
+  ParametricExpressionReturnStmtVisitor RetVis(*this);
+  RetVis->VisitCompoundStmt(Body);
+  ExprValueKind VK = RetVis.getResultType()->isReferenceType() ? VK_LValue :
+                                                                 VK_RValue;
+  QualType T = Rebuilder.getResultType().getNonReferenceType();
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc,
+                                              CSResult.getAs<CompoundStmt>(),
+                                              T, VK, Params);
 }
 
 // used in ActOnParametricExpression and

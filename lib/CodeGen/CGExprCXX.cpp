@@ -2275,7 +2275,6 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                           AggValueSlot AggSlot) {
   // TODO make RAII object to handle ReturnValue, NumReturnExprs, et al.
   const Decl *OldCurCodeDecl = CurCodeDecl;
-  CurCodeDecl = E->getOrigDecl();
   Address OldReturnValue = ReturnValue;
   unsigned OldNumReturnExprs = NumReturnExprs;
   unsigned OldNumSimpleReturnExprs = NumSimpleReturnExprs;

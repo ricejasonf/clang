@@ -23,6 +23,7 @@ def IndirectGotoStmt : Stmt;
 def ContinueStmt : Stmt;
 def BreakStmt : Stmt;
 def ReturnStmt : Stmt;
+def ParametricExpressionReturnStmt : Stmt;
 def DeclStmt  : Stmt;
 def SwitchCase : Stmt<1>;
 def CaseStmt : DStmt<SwitchCase>;

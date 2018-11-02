@@ -3459,7 +3459,7 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
 
 StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
   if (getCurParametricExpressionDecl()) {
-    return new (Context) ReturnStmt(ReturnLoc, RetValExp, nullptr);
+    return BuildParametricExpressionReturnStmt(ReturnLoc, RetValExp);
   }
 
   // Check for unexpanded parameter packs.
@@ -4307,4 +4307,26 @@ StmtResult Sema::ActOnCapturedRegionEnd(Stmt *S) {
   PopFunctionScopeInfo();
 
   return Res;
+}
+
+StmtResult Sema::BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
+                                                     Expr *RetValExp) {
+  // TODO get NRVO candidate information from CurScope 
+  VarDecl *NRVOCandidate = nullptr;
+
+  if (RetValExp && isa<InitListExpr>(RetValExp)) {
+    getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_return_init_list);
+    return StmtError();
+  }
+
+  ParametricExpressionReturnStmt New =
+    new (Context) ParametricExpressionReturnStmt(ReturnLoc, RetValExp,
+                                                 NRVOCandidate);
+
+  if (ExprEvalContexts.back().Context ==
+          ExpressionEvaluationContext::DiscardedStatement) {
+    New.setUnreachable();
+  }
+
+  return New;
 }

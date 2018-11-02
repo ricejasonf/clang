@@ -4824,7 +4824,6 @@ public:
 //                                return value
 //                           
 class ParametricExpressionCallExpr : public Expr {
-  ParametricExpressionDecl *OrigDecl;
   SourceLocation BeginLoc;
   unsigned NumParams = 0;
   ParmVarDecl** ParamInfo;
@@ -4832,19 +4831,16 @@ class ParametricExpressionCallExpr : public Expr {
   // The CompoundStmt Body is in Children[0]
   // The Param Init Exprs are in Children[I + 1]
 
-  ParametricExpressionCallExpr(ParametricExpressionDecl *OD, SourceLocation BL,
-                               CompoundStmt *B, QualType QT, ExprValueKind VK)
+  ParametricExpressionCallExpr(SourceLocation BL, CompoundStmt *B,
+                               QualType QT, ExprValueKind VK)
     : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
            false, false, false, false),
-      OrigDecl(OD),
       BeginLoc(BL) {}
 public:
-  static ParametricExpressionCallExpr *Create(ASTContext &C, ParametricExpressionDecl *OD,
-                                              SourceLocation BL, CompoundStmt *B,
-                                              QualType QT, ExprValueKind VK,
+  static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
+                                              CompoundStmt *B, QualType QT,
+                                              ExprValueKind VK,
                                               ArrayRef<ParmVarDecl *> Params);
-
-  ParametricExpressionDecl *getOrigDecl() const { return OrigDecl; }
 
   CompoundStmt *getBody() const {
     return static_cast<CompoundStmt*>(Children[0]);
