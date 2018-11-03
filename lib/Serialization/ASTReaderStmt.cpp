@@ -305,6 +305,14 @@ void ASTStmtReader::VisitReturnStmt(ReturnStmt *S) {
   S->setNRVOCandidate(ReadDeclAs<VarDecl>());
 }
 
+void ASTStmtReader::VisitParametricExpressionReturnStmt(
+    ParametricExpressionReturnStmt *S) {
+  VisitStmt(S);
+  S->setRetValue(Record.readSubExpr());
+  S->setReturnLoc(ReadSourceLocation());
+  S->setNRVOCandidate(ReadDeclAs<VarDecl>());
+}
+
 void ASTStmtReader::VisitDeclStmt(DeclStmt *S) {
   VisitStmt(S);
   S->setStartLoc(ReadSourceLocation());
@@ -3216,6 +3224,10 @@ Stmt *ASTReader::ReadStmtFromStream(ModuleFile &F) {
 
     case STMT_RETURN:
       S = new (Context) ReturnStmt(Empty);
+      break;
+
+    case STMT_PARAMETRIC_EXPRESSION_RETURN:
+      S = new (Context) ParametricExpressionReturnStmt(Empty);
       break;
 
     case STMT_DECL:

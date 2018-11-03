@@ -221,6 +221,15 @@ void ASTStmtWriter::VisitReturnStmt(ReturnStmt *S) {
   Code = serialization::STMT_RETURN;
 }
 
+void ASTStmtWriter::VisitParametricExpressionReturnStmt(
+            ParametricExpressionReturnStmt *S) {
+  VisitStmt(S);
+  Record.AddStmt(S->getRetValue());
+  Record.AddSourceLocation(S->getReturnLoc());
+  Record.AddDeclRef(S->getNRVOCandidate());
+  Code = serialization::STMT_PARAMETRIC_EXPRESSION_RETURN;
+}
+
 void ASTStmtWriter::VisitDeclStmt(DeclStmt *S) {
   VisitStmt(S);
   Record.AddSourceLocation(S->getBeginLoc());

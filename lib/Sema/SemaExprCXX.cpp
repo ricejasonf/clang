@@ -8016,6 +8016,8 @@ public:
                                            PackSize));
           */
         } else {
+          // TODO move this stuff to TemplateInstantiator to support pack expansions
+          llvm_unreachable("pack expansions in parametric expressions  not supported yet");
           return FunctionParmPackExpr::Create(getSema().Context, E->getType(),
                                               OP, E->getExprLoc(),
                                               ArrayRef<ParmVarDecl*>(&(PVec[PMapItr->second]),
@@ -8037,38 +8039,6 @@ public:
     }
     return Base::TransformDeclRefExpr(E);
   }
-
-  StmtResult TransformReturnStmt(ReturnStmt *S) {
-    ExprResult Result = getDerived().TransformExpr(S->getRetValue());
-
-    if (Result.isInvalid())
-      return StmtError();
-
-    if (isa<InitListExpr>(Result.get())) {
-      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_return_init_list);
-      return StmtError();
-    }
-
-    Result = getSema().ActOnFinishFullExpr(Result.get());
-
-    if (Result.isInvalid())
-      return StmtError();
-
-    QualType CurrentResultType = Result.get()->getType();
-
-    if (ResultType.isNull()) {
-      ResultType = CurrentResultType;
-    } else if (
-        getSema().Context.getCanonicalType(ResultType)
-     != getSema().Context.getCanonicalType(CurrentResultType)) {
-      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_different_deductions)
-        << 1 // is decltype(auto)
-        << CurrentResultType << ResultType;
-    }
-
-    return new (getSema().Context) ReturnStmt(S->getReturnLoc(), Result.get(), nullptr);
-  }
-
 };
 
 // This is used to deduce the return type for parametric expressions.
@@ -8087,24 +8057,24 @@ public:
     return ResultType;
   }
 
-  VisitParametricExpressionReturnStmt(ParametricExpressionReturnStmt *RS) {
+  bool VisitParametricExpressionReturnStmt(ParametricExpressionReturnStmt *RS) {
     if (RS->isUnreachable())
-      return true;;
+      return true;
 
     Expr *RE = RS->getRetValue();
-    QualType CurrentResultType();
+    QualType CurrentResultType{};
     if (RE) {
       CurrentResultType = RS->getRetValue()->getType();
     } else {
       CurrentResultType = SemaRef.Context.VoidTy;
     }
 
-    if (ResultType.isNull() || ResultType.isDependendentType()) {
+    if (ResultType.isNull() || ResultType->isDependentType()) {
       ResultType = CurrentResultType;
     } else if (
-        getSema().Context.getCanonicalType(ResultType)
-     != getSema().Context.getCanonicalType(CurrentResultType)) {
-      getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_different_deductions)
+        SemaRef.Context.getCanonicalType(ResultType)
+     != SemaRef.Context.getCanonicalType(CurrentResultType)) {
+      SemaRef.Diag(RS->getReturnLoc(), diag::err_auto_fn_different_deductions)
         << 1 // decltype(auto)
         << CurrentResultType << ResultType;
     }
@@ -8114,18 +8084,20 @@ public:
 
   // Don't visit enclosed scopes
 
-  VisitLambdaExpr(LambdaExpr *) {
+  bool VisitLambdaExpr(LambdaExpr *) {
     return true;
   }
 
-  VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
+  bool VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
     return true;
   }
 
-  VisitReturnStmt(ReturnStmt *) {
+  bool VisitReturnStmt(ReturnStmt *) {
     llvm_unreachable("ParametricExpressionReturnStmtVisitor in invalid scope");
+    return true;
   }
-}
+};
+} // end anon namespace
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
                                                    MultiExprArg ArgExprs,
@@ -8194,12 +8166,9 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     if (CSResult.isInvalid())
       return ExprError();
 
-    ExprValueKind VK = Rebuilder.getResultType()->isReferenceType() ? VK_LValue :
-                                                                      VK_RValue;
-    QualType T = Rebuilder.getResultType().getNonReferenceType();
-    return ParametricExpressionCallExpr::Create(Context, D, LParenLoc,
-                                                CSResult.getAs<CompoundStmt>(),
-                                                T, VK, NewParmVarDecls);
+    return BuildParametricExpressionCallExpr(LParenLoc,
+                                             CSResult.getAs<CompoundStmt>(),
+                                             NewParmVarDecls);
   } else {
     // Output should be an Expr at this point
     RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
@@ -8207,17 +8176,16 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   }
 }
 
-ExprResult BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
+ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
                                              CompoundStmt *Body,
                                              ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionReturnStmtVisitor RetVis(*this);
-  RetVis->VisitCompoundStmt(Body);
-  ExprValueKind VK = RetVis.getResultType()->isReferenceType() ? VK_LValue :
-                                                                 VK_RValue;
-  QualType T = Rebuilder.getResultType().getNonReferenceType();
-  return ParametricExpressionCallExpr::Create(Context, BeginLoc,
-                                              CSResult.getAs<CompoundStmt>(),
-                                              T, VK, Params);
+  ParametricExpressionReturnStmtVisitor R(*this);
+  R.TraverseStmt(Body);
+  ExprValueKind VK = R.getResultType()->isReferenceType() ? VK_LValue :
+                                                            VK_RValue;
+  QualType T = R.getResultType().getNonReferenceType();
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc, Body, T,
+                                              VK, Params);
 }
 
 // used in ActOnParametricExpression and

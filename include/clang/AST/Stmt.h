@@ -1596,6 +1596,9 @@ protected:
       : Stmt(SC), RetLoc(RL), RetExpr((Stmt *)E),
         NRVOCandidate(NRVOCandidate) {}
 
+  ReturnStmt(StmtClass SC, EmptyShell Empty)
+      : Stmt(SC, Empty) {}
+
 public:
   explicit ReturnStmt(SourceLocation RL) : ReturnStmt(RL, nullptr, nullptr) {}
 

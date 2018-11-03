@@ -3446,7 +3446,7 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
     return R;
 
   if (VarDecl *VD =
-      const_cast<VarDecl*>(cast<ReturnStmt>(R.get())->getNRVOCandidate())) {
+      const_cast<VarDecl*>(R.getAs<ReturnStmt>()->getNRVOCandidate())) {
     CurScope->addNRVOCandidate(VD);
   } else {
     CurScope->setNoNRVO();
@@ -4315,17 +4315,17 @@ StmtResult Sema::BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
   VarDecl *NRVOCandidate = nullptr;
 
   if (RetValExp && isa<InitListExpr>(RetValExp)) {
-    getSema().Diag(S->getReturnLoc(), diag::err_auto_fn_return_init_list);
+    Diag(ReturnLoc, diag::err_auto_fn_return_init_list);
     return StmtError();
   }
 
-  ParametricExpressionReturnStmt New =
+  ParametricExpressionReturnStmt *New =
     new (Context) ParametricExpressionReturnStmt(ReturnLoc, RetValExp,
                                                  NRVOCandidate);
 
   if (ExprEvalContexts.back().Context ==
           ExpressionEvaluationContext::DiscardedStatement) {
-    New.setUnreachable();
+    New->setUnreachable();
   }
 
   return New;

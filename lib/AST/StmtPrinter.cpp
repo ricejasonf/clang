@@ -408,6 +408,11 @@ void StmtPrinter::VisitReturnStmt(ReturnStmt *Node) {
   if (Policy.IncludeNewlines) OS << "\n";
 }
 
+void StmtPrinter::VisitParametricExpressionReturnStmt(
+                        ParametricExpressionReturnStmt *Node) {
+  VisitReturnStmt(Node);
+}
+
 void StmtPrinter::VisitGCCAsmStmt(GCCAsmStmt *Node) {
   Indent() << "asm ";
 

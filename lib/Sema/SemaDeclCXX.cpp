@@ -10645,7 +10645,8 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
   if (NeedsRAII) {
     Body = CS;
   } else if (!CS->body_empty()) {
-    ReturnStmt *SingleReturn = dyn_cast<ReturnStmt>(CS->body_back());
+    ParametricExpressionReturnStmt *SingleReturn =
+      dyn_cast<ParametricExpressionReturnStmt>(CS->body_back());
     if (CS->size() == 1 && SingleReturn) {
       Body = SingleReturn->getRetValue();
     } else {

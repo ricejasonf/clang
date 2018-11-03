@@ -1339,6 +1339,16 @@ public:
     return getSema().BuildReturnStmt(ReturnLoc, Result);
   }
 
+  /// Build a new return statement in the context of a parametric
+  /// expression
+  //
+  /// By default, performs semantic analysis to build the new statement.
+  /// Subclasses may override this routine to provide different behavior.
+  StmtResult RebuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
+                                                   Expr *Result) {
+    return getSema().BuildParametricExpressionReturnStmt(ReturnLoc, Result);
+  }
+
   /// Build a new declaration statement.
   ///
   /// By default, performs semantic analysis to build the new statement.
@@ -3243,16 +3253,13 @@ public:
                                             RParenLoc);
   }
 
-  // Build a new parametric expression that has compound statements
+  // Build a new call to a parametric expression
   //
   // By default, just creates a new one with the given inputs
-  ExprResult RebuildParametricExpressionCallExpr(SourceLocation BeginLoc, 
-                                                 ParametricExpressionDecl *OD,
-                                                 CompoundStmt *Body, QualType QT,
-                                                 ExprValueKind VK,
+  ExprResult RebuildParametricExpressionCallExpr(SourceLocation BeginLoc,
+                                                 CompoundStmt *Body,
                                                  ArrayRef<ParmVarDecl *> Params) {
-    return ParametricExpressionCallExpr::Create(SemaRef.Context, OD, BeginLoc, Body,
-                                                QT, VK, Params);
+    return SemaRef.BuildParametricExpressionCallExpr(BeginLoc, Body, Params);
   }
 
 private:
@@ -6860,6 +6867,21 @@ TreeTransform<Derived>::TransformReturnStmt(ReturnStmt *S) {
   // FIXME: We always rebuild the return statement because there is no way
   // to tell whether the return type of the function has changed.
   return getDerived().RebuildReturnStmt(S->getReturnLoc(), Result.get());
+}
+
+template<typename Derived>
+StmtResult
+TreeTransform<Derived>::TransformParametricExpressionReturnStmt(
+    ParametricExpressionReturnStmt *S) {
+  ExprResult Result = getDerived().TransformExpr(S->getRetValue());
+  if (Result.isInvalid())
+    return StmtError();
+
+  if (getDerived().AlwaysRebuild() && Result.get() == S->getRetValue())
+    return S;
+
+  return getDerived().RebuildParametricExpressionReturnStmt(S->getReturnLoc(),
+                                                            Result.get());
 }
 
 template<typename Derived>
@@ -12841,13 +12863,9 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
     return E;
   }
 
-  return ParametricExpressionCallExpr::Create(getSema().Context,
-                                              E->getOrigDecl(),
-                                              E->getBeginLoc(),
-                                              CSResult.getAs<CompoundStmt>(),
-                                              E->getType(),
-                                              E->getValueKind(),
-                                              NewParmVarDecls);
+  return RebuildParametricExpressionCallExpr(E->getBeginLoc(),
+                                            CSResult.getAs<CompoundStmt>(),
+                                            NewParmVarDecls);
 }
 
 } // end namespace clang

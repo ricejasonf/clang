@@ -1601,6 +1601,9 @@ namespace serialization {
       /// A ReturnStmt record.
       STMT_RETURN,
 
+      /// A ReturnStmt record.
+      STMT_PARAMETRIC_EXPRESSION_RETURN,
+
       /// A DeclStmt record.
       STMT_DECL,
 

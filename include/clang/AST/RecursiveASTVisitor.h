@@ -2190,6 +2190,7 @@ DEF_TRAVERSE_STMT(MSDependentExistsStmt, {
 })
 
 DEF_TRAVERSE_STMT(ReturnStmt, {})
+DEF_TRAVERSE_STMT(ParametricExpressionReturnStmt, {})
 DEF_TRAVERSE_STMT(SwitchStmt, {})
 DEF_TRAVERSE_STMT(WhileStmt, {})
 

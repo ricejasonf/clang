@@ -3849,6 +3849,8 @@ public:
                              Scope *CurScope);
   StmtResult BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp);
   StmtResult ActOnCapScopeReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp);
+  StmtResult BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
+                                                 Expr *RetValExp);
 
   StmtResult ActOnGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
                              bool IsVolatile, unsigned NumOutputs,
@@ -4683,6 +4685,8 @@ public:
 
   ExprResult ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
                                                SourceLocation LParenLoc);
+  ExprResult BuildParametricExpressionCallExpr(SourceLocation BeginLoc, CompoundStmt *Body,
+                                               ArrayRef<ParmVarDecl*> Params);
   ParmVarDecl *BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr);
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,

@@ -2850,7 +2850,7 @@ public:
   void EmitDoStmt(const DoStmt &S, ArrayRef<const Attr *> Attrs = None);
   void EmitForStmt(const ForStmt &S,
                    ArrayRef<const Attr *> Attrs = None);
-  void EmitReturnStmt(const ReturnStmt &S);
+  void EmitReturnStmt(const ReturnStmt &S, bool IsParmExpr = false);
   void EmitDeclStmt(const DeclStmt &S);
   void EmitBreakStmt(const BreakStmt &S);
   void EmitContinueStmt(const ContinueStmt &S);

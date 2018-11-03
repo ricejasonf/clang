@@ -304,6 +304,11 @@ void StmtProfiler::VisitReturnStmt(const ReturnStmt *S) {
   VisitStmt(S);
 }
 
+void StmtProfiler::VisitParametricExpressionReturnStmt(
+                        const ParametricExpressionReturnStmt *S) {
+  VisitStmt(S);
+}
+
 void StmtProfiler::VisitGCCAsmStmt(const GCCAsmStmt *S) {
   VisitStmt(S);
   ID.AddBoolean(S->isVolatile());

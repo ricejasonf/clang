@@ -536,6 +536,7 @@ class ParametricExpressionReturnStmt : public ReturnStmt {
   // we lose context during deduction
   bool Unreachable = false;
 
+public:
   explicit ParametricExpressionReturnStmt(SourceLocation RL)
     : ParametricExpressionReturnStmt(RL, nullptr, nullptr) {}
 
@@ -543,6 +544,9 @@ class ParametricExpressionReturnStmt : public ReturnStmt {
                                  const VarDecl *NRVOCandidate)
     : ReturnStmt(ParametricExpressionReturnStmtClass,
                  RL, E, NRVOCandidate) {}
+
+  explicit ParametricExpressionReturnStmt(EmptyShell Empty)
+    : ReturnStmt(ParametricExpressionReturnStmtClass, Empty) {}
 
   void setUnreachable() {
     Unreachable = true;
