@@ -7910,139 +7910,7 @@ Sema::CheckMicrosoftIfExistsSymbol(Scope *S, SourceLocation KeywordLoc,
 }
 
 namespace {
-// Because VarDecls and such can appear in expressions
-// we preemptively rebuild them with the new context
-class RebuildExpressionDeclContext
-  : public RecursiveASTVisitor<RebuildExpressionDeclContext> {
-public:
-  using TransformedLocalDeclFn = llvm::function_ref<void(Decl*, Decl*)>;
-
-private:
-  // We are using a type erased function to use this with
-  // multiple rebuilder types
-  TransformedLocalDeclFn transformedLocalDecl;
-  Sema &S;
-  DeclContext* OrigCtx;
-
-  explicit RebuildExpressionDeclContext(TransformedLocalDeclFn TFn, Sema &S, DeclContext *O)
-    : transformedLocalDecl(TFn), S(S), OrigCtx(O) {}
-public:
-  template <typename Transform>
-  static bool Traverse(Transform &T, DeclContext *O, Stmt *St) {
-    auto TFn = [&T](Decl *A, Decl *B) { T.transformedLocalDecl(A, B); };
-    RebuildExpressionDeclContext R(TFn, T.getSema(), O);
-    return R.TraverseStmt(St);
-  }
-
-  bool VisitVarDecl(VarDecl *VD) {
-    if (VD->getDeclContext() == OrigCtx) {
-      VarDecl *NewVD = VarDecl::Create(S.Context, S.CurContext,
-                                       VD->getInnerLocStart(),
-                                       VD->getLocation(),
-                                       VD->getIdentifier(),
-                                       VD->getType(), VD->getTypeSourceInfo(),
-                                       VD->getStorageClass());
-      transformedLocalDecl(VD, NewVD);
-    }
-    return false;
-  }
-};
-
-// This is used to substitute an expression in a new context
-// via `using` parameters
-class ExpressionContextRebuilder : public TreeTransform<ExpressionContextRebuilder> {
-  using Base = TreeTransform<ExpressionContextRebuilder>;
-  DeclContext *OldContext;
-
-  ExpressionContextRebuilder(Sema& S, DeclContext *OldContext)
-    : Base(S), OldContext(OldContext) {}
-
-public:
-  static ExprResult Transform(Sema& S, DeclContext *O, Expr* E) {
-    ExpressionContextRebuilder R(S, O);
-    RebuildExpressionDeclContext::Traverse(R, O, E);
-    return R.TransformExpr(E);
-  }
-
-  bool AlwaysRebuild() { return true; }
-};
-
-class ParametricExpressionRebuilder : public TreeTransform<ParametricExpressionRebuilder> {
-  using Base = TreeTransform<ParametricExpressionRebuilder>;
-  using ParamVec = llvm::SmallVectorImpl<ParmVarDecl*>;
-  using ParamMap = llvm::SmallDenseMap<ParmVarDecl*, unsigned>;
-  // ParamMap maps to index of ParmVec or MultiExprArg
-
-  DeclContext* OrigDeclContext;
-  ParamMap& PMap;
-  ParamVec& PVec;
-  MultiExprArg ArgExprs;
-  bool ExpandingExprAlias;
-  QualType ResultType = {};
-
-public:
-  ParametricExpressionRebuilder(Sema &SemaRef, DeclContext* ODC,
-                                ParamMap& PM, ParamVec& PV, MultiExprArg A,
-                                bool ExpandingExprAlias = false)
-    : Base(SemaRef), OrigDeclContext(ODC), PMap(PM), PVec(PV), ArgExprs(A),
-      ExpandingExprAlias(ExpandingExprAlias) {
-  }
-
-  QualType getResultType() {
-    if (ResultType.isNull()) {
-      return SemaRef.Context.VoidTy;
-    } else {
-      return ResultType;
-    }
-  }
-
-  bool AlwaysRebuild() {
-    return  ExpandingExprAlias || Base::AlwaysRebuild();
-  }
-
-  ExprResult TransformDeclRefExpr(DeclRefExpr* E) {
-    auto PMapItr = PMap.find(dyn_cast<ParmVarDecl>(E->getDecl()));
-    if (PMapItr != PMap.end()) {
-      ParmVarDecl* OP = PMapItr->first;
-      if (OP->isParameterPack()) {
-        int PackSize = ArgExprs.size() - PMap.size() + 1;
-
-        if (OP->isUsingSpecified()) {
-          llvm_unreachable("TODO Implement UsingParmPackExpr");
-          /*
-          return UsingParmPackExpr::Create(getSema().Context, E->getType(),
-                                           OP, E->getExprLoc(),
-                                           ArrayRef<Expr*>(ArgExprs[PMapItr->second],
-                                           PackSize));
-          */
-        } else {
-          // TODO move this stuff to TemplateInstantiator to support pack expansions
-          llvm_unreachable("pack expansions in parametric expressions  not supported yet");
-          return FunctionParmPackExpr::Create(getSema().Context, E->getType(),
-                                              OP, E->getExprLoc(),
-                                              ArrayRef<ParmVarDecl*>(&(PVec[PMapItr->second]),
-                                                                     PackSize));
-        }
-      } else {
-        if (OP->isUsingSpecified()) {
-          // Substitute the DeclRef with the ArgExpr
-          return ExpressionContextRebuilder::Transform(getSema(), OrigDeclContext,
-                                                       ArgExprs[PMapItr->second]);
-        } else {
-          // rebuild declref to point to the mapped ParmVarDecl
-          return getDerived().RebuildDeclRefExpr(E->getQualifierLoc(),
-                                                 PVec[PMapItr->second],
-                                                 E->getNameInfo(),
-                                                 /* TemplateArgs */ nullptr);
-        }
-      }
-    }
-    return Base::TransformDeclRefExpr(E);
-  }
-};
-
-// This is used to deduce the return type for parametric expressions.
-// Perhaps this is overkill.
+// This is used to deduce the return type for a parametric expression.
 class ParametricExpressionReturnStmtVisitor
   : public RecursiveASTVisitor<ParametricExpressionReturnStmtVisitor> {
 
@@ -8131,38 +7999,35 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap;
   ParamMap.init(D->getNumParams());
 
+  // TODO Do we need to push to CurrentInstantiationScope
+  //      before we start mutilating it?
+  //
+  //      Do we need to provide TemplateArgs to the calls
+  //      to SubstStmt and SubstExpr?
+  //      (perhaps that could be an arg for this function)
+
   // iterate declared params
   for (auto P : D->parameters()) {
     int Count = P->isParameterPack() ? PackSize : 1;
-    if (P->isUsingSpecified()) {
-      // Old Param maps to index of Expr in ArgExprs
-      // This allows us to map packs to mutliple exprs when we transform
-      ParamMap[P] = std::distance(ArgExprs.begin(), ArgExprsItr);
-      ArgExprsItr += Count;
-    } else {
-      // Old Param maps to index of new ParmVarDecl in NewParmVarDecls
-      // This allows us to map packs to mutliple vars when we transform
-      ParamMap[P] = NewParmVarDecls.size();
-
-      for (int i = 0; i < Count; i++) {
+    if (P->isParameterPack()) {
+      CurrentInstantiationScope->MakeInstantiatedLocalArgPack(P);
+      for (Int I = 0; I < Count; I++) {
         assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
-        ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
-        if (!New)
-          return ExprError();
-        NewParmVarDecls.push_back(New);
+        assert(Count >= 0 && "PackSize is negative");
+        CurrentInstantiationScope->InstantiatedLocalPackArg(
+            P,
+            BuildParametricExpressionParam(P, *ArgExprsItr));
         ++ArgExprsItr;
       }
+    } else {
+      assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
+      CurrentInstantiationScope->InstantiatedLocal(
+        P, BuildParametricExpressionParam(P, *ArgExprsItr));
     }
   }
 
-  // TODO use a TemplateInstantiator here or SubstStmt and SubstExpr or something
-  ParametricExpressionRebuilder Rebuilder(*this, D->getDeclContext(), ParamMap,
-                                          NewParmVarDecls, ArgExprs);
-
   if (CompoundStmt::classof(Output)) {
-    RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
-    StmtResult CSResult = Rebuilder.TransformStmt(Output);
-
+    StmtResult CSResult = SubstStmt(Output);
     if (CSResult.isInvalid())
       return ExprError();
 
@@ -8170,9 +8035,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
                                              CSResult.getAs<CompoundStmt>(),
                                              NewParmVarDecls);
   } else {
-    // Output should be an Expr at this point
-    RebuildExpressionDeclContext::Traverse(Rebuilder, D->getDeclContext(), Output);
-    return Rebuilder.TransformExpr(static_cast<Expr*>(Output));
+    return SubstExpr(Output);
   }
 }
 
@@ -8190,7 +8053,7 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
 
 // used in ActOnParametricExpression and
 // TreeTransform<Derived>::TransformParametricExpressionCallExpr
-ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr) {
+ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExpr) {
   QualType ArgTy;
   if (ArgExpr->isRValue()) {
     ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
@@ -8201,12 +8064,14 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *A
   TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(ArgTy);
   ParmVarDecl *New = ParmVarDecl::Create(Context,
                                          CurContext,
-                                         OldParam->getInnerLocStart(),
-                                         OldParam->getLocation(),
-                                         OldParam->getIdentifier(),
+                                         Old->getInnerLocStart(),
+                                         Old->getLocation(),
+                                         Old->getIdentifier(),
                                          NewDI->getType(), NewDI,
-                                         OldParam->getStorageClass(),
+                                         Old->getStorageClass(),
                                          /* DefArg */ nullptr);
+  New->setUsingSpecified(Old.IsUsingSpecified());
+  New->setConstexpr(Old->isConstexpr());
   ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
   if (InitExprResult.isInvalid())
     return nullptr;

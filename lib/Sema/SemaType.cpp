@@ -4983,8 +4983,6 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       }
       break;
     case DeclaratorContext::ParametricExpressionParameterContext: {
-      // FIXME: This is a hack. Is there way to create a parameter
-      //        pack of something like DependentTy?
       TemplateTypeParmDecl *DummyTemplateParam =
           TemplateTypeParmDecl::Create(
               S.Context, S.Context.getTranslationUnitDecl(),

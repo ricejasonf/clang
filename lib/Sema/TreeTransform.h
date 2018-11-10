@@ -8933,6 +8933,14 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
       return ExprError();
   }
 
+  if (VarDecl* VD = dyn_cast<VarDecl>(ND)) {
+    if (VD->isUsingSpecified() && VD->hasInit()) {
+      // FIXME ExpandingExprAliasRAII probably not needed
+      //ExpandingExprAliasRAII ExpandingExprAlias(Sema);
+      return SubstExpr(VD->getInit());
+    }
+  }
+
   if (!getDerived().AlwaysRebuild() &&
       QualifierLoc == E->getQualifierLoc() &&
       ND == E->getDecl() &&
