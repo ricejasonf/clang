@@ -4638,6 +4638,39 @@ Sema::InstantiateMemInitializers(CXXConstructorDecl *New,
                        AnyErrors);
 }
 
+void Sema::InstantiateParametricExpressionParams(
+                            ArrayRef<ParmVarDecl*> OldParams,
+                            MutableArrayRef<ParmVarDecl*> NewParams,
+                            MultiExprArg ArgExprs) {
+  assert(NewParams.size() == ArgExprs.size() &&
+    "Number of arguments does not match size of output list");
+
+  LocalInstantiationScope Scope(*this);
+
+  int I = 0;
+  for (ParmVarDecl *P : OldParams) {
+    int Count = P->isParameterPack() ? PackSize : 1;
+    if (P->isParameterPack()) {
+      int PackSize = ArgExprs.size() - OldParams.size() + 1;
+      assert(PackSize >= 0 && "Pack size is negative!");
+
+      Scope.MakeInstantiatedLocalArgPack(P);
+      for (int J = 0; J < PackSize; J++) {
+        assert(I >= ArgExprs.size() && "ArgExprs index out of range");
+        ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+        NewParams[I] = New;
+        Scope.InstantiatedLocalPackArg(P, New);
+        ++I;
+      }
+    } else {
+      assert(I >= ArgExprs.size() && "ArgExprs index out of range");
+      ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+      NewParams[I] = New;
+      Scope.InstantiatedLocal(P, New);
+    }
+  }
+}
+
 // TODO: this could be templated if the various decl types used the
 // same method name.
 static bool isInstantiationOf(ClassTemplateDecl *Pattern,

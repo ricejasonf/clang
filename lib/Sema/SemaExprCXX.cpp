@@ -7995,37 +7995,14 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   assert(Output && "ParametricExpressionDecl Output is nullptr");
 
   auto ArgExprsItr = ArgExprs.begin();
-  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls;
-  llvm::SmallDenseMap<ParmVarDecl*, unsigned> ParamMap;
-  ParamMap.init(D->getNumParams());
+  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls(ArgExprs.size());
 
-  // TODO Do we need to push to CurrentInstantiationScope
-  //      before we start mutilating it?
-  //
+  InstantiateParametricExpressionParams(D->parameters(), NewParmVarDecls,
+                                       ArgExprs);
+
+  // TODO
   //      Do we need to provide TemplateArgs to the calls
   //      to SubstStmt and SubstExpr?
-  //      (perhaps that could be an arg for this function)
-
-  // iterate declared params
-  for (auto P : D->parameters()) {
-    int Count = P->isParameterPack() ? PackSize : 1;
-    if (P->isParameterPack()) {
-      CurrentInstantiationScope->MakeInstantiatedLocalArgPack(P);
-      for (Int I = 0; I < Count; I++) {
-        assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
-        assert(Count >= 0 && "PackSize is negative");
-        CurrentInstantiationScope->InstantiatedLocalPackArg(
-            P,
-            BuildParametricExpressionParam(P, *ArgExprsItr));
-        ++ArgExprsItr;
-      }
-    } else {
-      assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
-      CurrentInstantiationScope->InstantiatedLocal(
-        P, BuildParametricExpressionParam(P, *ArgExprsItr));
-    }
-  }
-
   if (CompoundStmt::classof(Output)) {
     StmtResult CSResult = SubstStmt(Output);
     if (CSResult.isInvalid())

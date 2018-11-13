@@ -8933,11 +8933,11 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
       return ExprError();
   }
 
-  if (VarDecl* VD = dyn_cast<VarDecl>(ND)) {
-    if (VD->isUsingSpecified() && VD->hasInit()) {
+  if (ParmVarDecl* PD = dyn_cast<ParmVarDecl>(ND)) {
+    if (PD->isUsingSpecified() && PD->hasInit()) {
       // FIXME ExpandingExprAliasRAII probably not needed
       //ExpandingExprAliasRAII ExpandingExprAlias(Sema);
-      return SubstExpr(VD->getInit());
+      return SemaRef.SubstExpr(PD->getInit(), {});
     }
   }
 
