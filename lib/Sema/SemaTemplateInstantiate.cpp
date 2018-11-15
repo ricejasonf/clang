@@ -490,6 +490,11 @@ void Sema::PrintInstantiationStack() {
         Diags.Report(Active->PointOfInstantiation,
                      diag::note_template_nsdmi_here)
             << FD << Active->InstantiationRange;
+      } else if (ParametricExpressionDecl *PD
+          = dyn_cast<ParametricExpressionDecl>(D)) {
+        Diags.Report(Active->PointOfInstantiation,
+                     diag::note_parametric_expression_instantiation_here)
+            << PD << Active->InstantiationRange;
       } else {
         Diags.Report(Active->PointOfInstantiation,
                      diag::note_template_type_alias_instantiation_here)

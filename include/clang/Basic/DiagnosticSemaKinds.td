@@ -4243,6 +4243,8 @@ def note_template_nsdmi_here : Note<
   "in instantiation of default member initializer %q0 requested here">;
 def note_template_type_alias_instantiation_here : Note<
   "in instantiation of template type alias %0 requested here">;
+def note_parametric_expression_instantiation_here : Note<
+  "in instantiation of parametric expression %0 requested here">;
 def note_template_exception_spec_instantiation_here : Note<
   "in instantiation of exception specification for %0 requested here">;
 def warn_var_template_missing : Warning<"instantiation of variable %q0 "
