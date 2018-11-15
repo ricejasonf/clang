@@ -1198,6 +1198,7 @@ CanThrowResult Sema::canThrow(const Expr *E) {
 
     // FIXME: We should handle StmtExpr, but that opens a MASSIVE can of worms.
   case Expr::StmtExprClass:
+  case Expr::ParametricExpressionCallExprClass:
     return CT_Can;
 
   case Expr::CXXDefaultArgExprClass:
@@ -1243,6 +1244,7 @@ CanThrowResult Sema::canThrow(const Expr *E) {
   case Expr::UnresolvedLookupExprClass:
   case Expr::UnresolvedMemberExprClass:
   case Expr::TypoExprClass:
+  case Expr::ParametricExpressionIdExprClass:
     // FIXME: Can any of the above throw?  If so, when?
     return CT_Cannot;
 

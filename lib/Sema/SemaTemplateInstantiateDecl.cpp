@@ -2556,10 +2556,49 @@ Decl *TemplateDeclInstantiator::VisitConstructorUsingShadowDecl(
 
 Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
                                               ParametricExpressionDecl *D) {
-  // Just clone the Decl with the new DeclContext
-  // The params and body get transformed at the site of invocation
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(SemaRef.Context,
                                                                    Owner, D);
+  // Enter the scope of this instantiation. We don't use
+  // PushDeclContext because we don't have a scope.
+  Sema::ContextRAII savedContext(SemaRef, New);
+  LocalInstantiationScope Scope(SemaRef);
+
+  // Params - just clone them with the new Decl as the DeclContext
+  SmallVector<ParmVarDecl*, 16> NewParams{};
+  for (ParmVarDecl *OldParm : D->parameters()) {
+    TypeSourceInfo *NewDI = OldParm->getTypeSourceInfo();
+    ParmVarDecl *NewParm = ParmVarDecl::Create(SemaRef.Context,
+                                               New,
+                                               OldParm->getInnerLocStart(),
+                                               OldParm->getLocation(),
+                                               OldParm->getIdentifier(),
+                                               NewDI->getType(),
+                                               NewDI,
+                                               OldParm->getStorageClass(),
+                                               /* DefArg */ nullptr);
+    NewParm->setUsingSpecified(OldParm->isUsingSpecified());
+    // TODO enable constexpr params
+    // NewParm->setConstexpr(OldParm->isConstexpr());
+    NewParams.push_back(NewParm);
+    Scope.InstantiatedLocal(OldParm, NewParm);
+  }
+  New->setParams(SemaRef.Context, NewParams);
+
+  // Body
+  Stmt* Body;
+  if (isa<CompoundStmt>(D->getBody())) {
+    StmtResult BodyResult = SemaRef.SubstStmt(D->getBody(), TemplateArgs);
+    if (BodyResult.isInvalid())
+      return nullptr;
+    Body = BodyResult.get();
+  } else {
+    ExprResult BodyResult = SemaRef.SubstExpr(cast<Expr>(D->getBody()), TemplateArgs);
+    if (BodyResult.isInvalid())
+      return nullptr;
+    Body = BodyResult.get();
+  }
+  New->setBody(Body);
+
   Owner->addDecl(New);
   return New;
 }

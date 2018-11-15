@@ -2922,17 +2922,15 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
   return New;
 }
 
-// This is for cloning with a new DeclContext for use in
-// template instantiations. Transform happens at invocation.
+// This is for cloning with a new DeclContext and Body for
+// use in template instantiations. Transform of parameters
+// is deferred until invocation.
 ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
                             ParametricExpressionDecl *Old) {
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
                                            Old->getBeginLoc());
-  New->Body = Old->Body;
-  New->ParamInfo = Old->ParamInfo;
-  New->NumParams = Old->NumParams;
   New->setAccess(Old->getAccess());
   return New;
 }

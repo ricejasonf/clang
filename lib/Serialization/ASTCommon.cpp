@@ -388,6 +388,7 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::BuiltinTemplate:
   case Decl::Decomposition:
   case Decl::Binding:
+  case Decl::ParametricExpression:
     return false;
 
   // These indirectly derive from Redeclarable<T> but are not actually
