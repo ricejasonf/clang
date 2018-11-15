@@ -34,6 +34,7 @@
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaDiagnostic.h"
 #include "clang/Sema/SemaInternal.h"
+#include "clang/Sema/Template.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
@@ -147,7 +148,10 @@ public:
   /// We must always rebuild all AST nodes when performing variadic template
   /// pack expansion, in order to avoid violating the AST invariant that each
   /// statement node appears at most once in its containing declaration.
-  bool AlwaysRebuild() { return SemaRef.ArgumentPackSubstitutionIndex != -1; }
+  bool AlwaysRebuild() {
+    return SemaRef.ExpandingExprAlias ||
+           SemaRef.ArgumentPackSubstitutionIndex != -1;
+  }
 
   /// Returns the location of the entity being transformed, if that
   /// information was not available elsewhere in the AST.
@@ -8935,8 +8939,7 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
 
   if (ParmVarDecl* PD = dyn_cast<ParmVarDecl>(ND)) {
     if (PD->isUsingSpecified() && PD->hasInit()) {
-      // FIXME ExpandingExprAliasRAII probably not needed
-      //ExpandingExprAliasRAII ExpandingExprAlias(Sema);
+      Sema::ExpandingExprAliasRAII ExpandingExprAlias(SemaRef);
       return SemaRef.SubstExpr(PD->getInit(), {});
     }
   }

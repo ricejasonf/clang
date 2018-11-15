@@ -35,6 +35,7 @@
 #include "clang/Sema/Scope.h"
 #include "clang/Sema/ScopeInfo.h"
 #include "clang/Sema/SemaLambda.h"
+#include "clang/Sema/Template.h"
 #include "clang/Sema/TemplateDeduction.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
@@ -7994,17 +7995,41 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   Stmt *Output = D->getBody();
   assert(Output && "ParametricExpressionDecl Output is nullptr");
 
-  auto ArgExprsItr = ArgExprs.begin();
+  LocalInstantiationScope Scope(*this);
+  InstantiatingTemplate Inst(*this, LParenLoc, D);
   llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls(ArgExprs.size());
 
-  InstantiateParametricExpressionParams(D->parameters(), NewParmVarDecls,
-                                       ArgExprs);
+  unsigned I = 0;
+  for (ParmVarDecl *P : D->parameters()) {
+    if (P->isParameterPack()) {
+      int PackSize = ArgExprs.size() - D->parameters().size() + 1;
+      assert(PackSize >= 0 && "Pack size is negative!");
 
-  // TODO
-  //      Do we need to provide TemplateArgs to the calls
+      Scope.MakeInstantiatedLocalArgPack(P);
+      for (int J = 0; J < PackSize; J++) {
+        assert(I < ArgExprs.size() && "ArgExprs index out of range");
+        ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+        NewParmVarDecls[I] = New;
+        Scope.InstantiatedLocalPackArg(P, New);
+        ++I;
+      }
+    } else {
+      assert(I < ArgExprs.size() && "ArgExprs index out of range");
+      ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+      NewParmVarDecls[I] = New;
+      Scope.InstantiatedLocal(P, New);
+      ++I;
+    }
+  }
+
+  // TODO Do we need to provide TemplateArgs to the calls
   //      to SubstStmt and SubstExpr?
+  //
+  //      Do we need to provide MultiLevelTemplateArgumentList
+  //      to SubstStmt/SubstExpr?
+
   if (CompoundStmt::classof(Output)) {
-    StmtResult CSResult = SubstStmt(Output);
+    StmtResult CSResult = SubstStmt(Output, {});
     if (CSResult.isInvalid())
       return ExprError();
 
@@ -8012,7 +8037,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
                                              CSResult.getAs<CompoundStmt>(),
                                              NewParmVarDecls);
   } else {
-    return SubstExpr(Output);
+    return SubstExpr(static_cast<Expr*>(Output), {});
   }
 }
 
@@ -8032,7 +8057,10 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
 // TreeTransform<Derived>::TransformParametricExpressionCallExpr
 ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExpr) {
   QualType ArgTy;
-  if (ArgExpr->isRValue()) {
+  if (Old->isUsingSpecified()) {
+    // The type could be an abstract type
+    ArgTy = ArgExpr->getType();
+  } else if (ArgExpr->isRValue()) {
     ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
   } else {
     ArgTy = Context.getLValueReferenceType(ArgExpr->getType());
@@ -8047,12 +8075,18 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExp
                                          NewDI->getType(), NewDI,
                                          Old->getStorageClass(),
                                          /* DefArg */ nullptr);
-  New->setUsingSpecified(Old.IsUsingSpecified());
-  New->setConstexpr(Old->isConstexpr());
-  ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
-  if (InitExprResult.isInvalid())
-    return nullptr;
-  AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
+  // FIXME ParmVarDecls cannot be constexpr yet
+  // New->setConstexpr(Old->isConstexpr());
+
+  if (!Old->isUsingSpecified()) {
+    ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
+    if (InitExprResult.isInvalid())
+      return nullptr;
+    AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
+  } else {
+    // Using Params can be any kind of part of an expression
+    New->setUsingSpecified(true);
+    New->setInit(ArgExpr);
+  }
   return New;
 }
-

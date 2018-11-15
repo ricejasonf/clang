@@ -7349,7 +7349,6 @@ public:
 
   friend class ArgumentPackSubstitutionRAII;
 
-#if 0 // FIXME probably not needed
   // Always require rebuilding in AST transformations
   // when substituting a declref with an expression
   // via `using` specified variables. This affects
@@ -7359,7 +7358,7 @@ public:
 
   class ExpandingExprAliasRAII {
     Sema &Self;
-    int OldValue;
+    bool OldValue;
 
   public:
     ExpandingExprAliasRAII(Sema &Self, int NewValue = true)
@@ -7371,7 +7370,6 @@ public:
       Self.ExpandingExprAlias = OldValue;
     }
   };
-#endif
 
   /// For each declaration that involved template argument deduction, the
   /// set of diagnostics that were suppressed during that template argument

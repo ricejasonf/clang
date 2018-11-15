@@ -2301,7 +2301,10 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   }
 
   for (ParmVarDecl* PD : E->parameters()) {
-    EmitAutoVarDecl(*PD);
+    // FIXME: Cull `using` params during instantiation.
+    if (!PD->isUsingSpecified()) {
+      EmitAutoVarDecl(*PD);
+    }
   }
 
   EmitCompoundStmtWithoutScope(*Body);

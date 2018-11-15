@@ -4638,6 +4638,7 @@ Sema::InstantiateMemInitializers(CXXConstructorDecl *New,
                        AnyErrors);
 }
 
+#if 0
 void Sema::InstantiateParametricExpressionParams(
                             ArrayRef<ParmVarDecl*> OldParams,
                             MutableArrayRef<ParmVarDecl*> NewParams,
@@ -4645,31 +4646,29 @@ void Sema::InstantiateParametricExpressionParams(
   assert(NewParams.size() == ArgExprs.size() &&
     "Number of arguments does not match size of output list");
 
-  LocalInstantiationScope Scope(*this);
-
-  int I = 0;
+  unsigned I = 0;
   for (ParmVarDecl *P : OldParams) {
-    int Count = P->isParameterPack() ? PackSize : 1;
     if (P->isParameterPack()) {
       int PackSize = ArgExprs.size() - OldParams.size() + 1;
       assert(PackSize >= 0 && "Pack size is negative!");
 
       Scope.MakeInstantiatedLocalArgPack(P);
       for (int J = 0; J < PackSize; J++) {
-        assert(I >= ArgExprs.size() && "ArgExprs index out of range");
+        assert(I < ArgExprs.size() && "ArgExprs index out of range");
         ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
         NewParams[I] = New;
         Scope.InstantiatedLocalPackArg(P, New);
         ++I;
       }
     } else {
-      assert(I >= ArgExprs.size() && "ArgExprs index out of range");
+      assert(I < ArgExprs.size() && "ArgExprs index out of range");
       ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
       NewParams[I] = New;
       Scope.InstantiatedLocal(P, New);
     }
   }
 }
+#endif
 
 // TODO: this could be templated if the various decl types used the
 // same method name.
@@ -4932,7 +4931,8 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
   //  - as long as we have a ParmVarDecl whose parent is non-dependent and
   //    whose type is not instantiation dependent, do nothing to the decl
   //  - otherwise find its instantiated decl.
-  if (isa<ParmVarDecl>(D) && !ParentDC->isDependentContext() &&
+  if (!ExpandingExprAlias &&
+      isa<ParmVarDecl>(D) && !ParentDC->isDependentContext() &&
       !cast<ParmVarDecl>(D)->getType()->isInstantiationDependentType())
     return D;
   if (isa<ParmVarDecl>(D) || isa<NonTypeTemplateParmDecl>(D) ||
