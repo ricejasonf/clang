@@ -4676,18 +4676,26 @@ public:
                               TypeResult Type, Decl *DeclFromDeclSpec);
 
   ParametricExpressionDecl *ActOnParametricExpressionDecl(
-                                      Scope *S, Scope *BodyScope, AccessSpecifier AS,
-                                      SourceLocation UsingLoc, bool &NeedsRAII,
-                                      MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                      Declarator &ParametricExpressionDeclarator);
-  Decl *ActOnFinishParametricExpressionDecl(ParametricExpressionDecl* D, bool NeedsRAII,
-                                            StmtResult CompoundStmtResult);
+                        Scope *S, Scope *BodyScope, AccessSpecifier AS,
+                        SourceLocation UsingLoc,
+                        unsigned TemplateDepth,
+                        Declarator &ParametricExpressionDeclarator);
+  bool CheckParametricExpressionParams(
+                        Scope *BodyScope, bool &NeedsRAII,
+                        ParametricExpressionDecl *New,
+                        MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo);
+  Decl *ActOnFinishParametricExpressionDecl(
+                        ParametricExpressionDecl* D, bool NeedsRAII,
+                        StmtResult CompoundStmtResult);
 
-  ExprResult ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn, MultiExprArg ArgExprs,
-                                               SourceLocation LParenLoc);
-  ExprResult BuildParametricExpressionCallExpr(SourceLocation BeginLoc, CompoundStmt *Body,
-                                               ArrayRef<ParmVarDecl*> Params);
-  ParmVarDecl *BuildParametricExpressionParam(ParmVarDecl *OldParam, Expr *ArgExpr);
+  ExprResult ActOnParametricExpressionCallExpr(
+                        Scope *S, Expr *Fn, MultiExprArg ArgExprs,
+                        SourceLocation LParenLoc);
+  ExprResult BuildParametricExpressionCallExpr(
+                        SourceLocation BeginLoc, CompoundStmt *Body,
+                        ArrayRef<ParmVarDecl*> Params);
+  ParmVarDecl *BuildParametricExpressionParam(
+                        ParmVarDecl *OldParam, Expr *ArgExpr);
 
   /// BuildCXXConstructExpr - Creates a complete call to a constructor,
   /// including handling of its default argument expressions.

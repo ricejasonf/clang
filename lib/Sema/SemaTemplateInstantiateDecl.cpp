@@ -2558,10 +2558,17 @@ Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
                                               ParametricExpressionDecl *D) {
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(SemaRef.Context,
                                                                    Owner, D);
+  New->setBody(D->getBody());
+  New->setParams(SemaRef.Context, D->parameters());
+#if 0
   // Enter the scope of this instantiation. We don't use
   // PushDeclContext because we don't have a scope.
   Sema::ContextRAII savedContext(SemaRef, New);
   LocalInstantiationScope Scope(SemaRef);
+
+  MultiLevelTemplateArgumentList DummyArgsLayer(TemplateArgs);
+  // We don't have args yet
+  DummyArgsLayer.addOuterTemplateArguments(None);
 
   // Params - just clone them with the new Decl as the DeclContext
   SmallVector<ParmVarDecl*, 16> NewParams{};
@@ -2587,17 +2594,20 @@ Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
   // Body
   Stmt* Body;
   if (isa<CompoundStmt>(D->getBody())) {
-    StmtResult BodyResult = SemaRef.SubstStmt(D->getBody(), TemplateArgs);
+    StmtResult BodyResult = SemaRef.SubstStmt(D->getBody(),
+                                              DummyArgsLayer);
     if (BodyResult.isInvalid())
       return nullptr;
     Body = BodyResult.get();
   } else {
-    ExprResult BodyResult = SemaRef.SubstExpr(cast<Expr>(D->getBody()), TemplateArgs);
+    ExprResult BodyResult = SemaRef.SubstExpr(cast<Expr>(D->getBody()),
+                                              DummyArgsLayer);
     if (BodyResult.isInvalid())
       return nullptr;
     Body = BodyResult.get();
   }
   New->setBody(Body);
+#endif
 
   Owner->addDecl(New);
   return New;
@@ -4676,38 +4686,6 @@ Sema::InstantiateMemInitializers(CXXConstructorDecl *New,
                        NewInits,
                        AnyErrors);
 }
-
-#if 0
-void Sema::InstantiateParametricExpressionParams(
-                            ArrayRef<ParmVarDecl*> OldParams,
-                            MutableArrayRef<ParmVarDecl*> NewParams,
-                            MultiExprArg ArgExprs) {
-  assert(NewParams.size() == ArgExprs.size() &&
-    "Number of arguments does not match size of output list");
-
-  unsigned I = 0;
-  for (ParmVarDecl *P : OldParams) {
-    if (P->isParameterPack()) {
-      int PackSize = ArgExprs.size() - OldParams.size() + 1;
-      assert(PackSize >= 0 && "Pack size is negative!");
-
-      Scope.MakeInstantiatedLocalArgPack(P);
-      for (int J = 0; J < PackSize; J++) {
-        assert(I < ArgExprs.size() && "ArgExprs index out of range");
-        ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
-        NewParams[I] = New;
-        Scope.InstantiatedLocalPackArg(P, New);
-        ++I;
-      }
-    } else {
-      assert(I < ArgExprs.size() && "ArgExprs index out of range");
-      ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
-      NewParams[I] = New;
-      Scope.InstantiatedLocal(P, New);
-    }
-  }
-}
-#endif
 
 // TODO: this could be templated if the various decl types used the
 // same method name.

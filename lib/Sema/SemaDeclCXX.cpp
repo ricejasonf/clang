@@ -10534,10 +10534,9 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 }
 
 ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
-                                          Scope *S, Scope *BodyScope, AccessSpecifier AS,
-                                          SourceLocation UsingLoc, bool &NeedsRAII,
-                                          MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo,
-                                          Declarator &ParametricExpressionDeclarator) {
+                          Scope *S, Scope *BodyScope, AccessSpecifier AS,
+                          SourceLocation UsingLoc, unsigned TemplateDepth,
+                          Declarator &ParametricExpressionDeclarator) {
   DeclarationNameInfo NameInfo = GetNameForDeclarator(
       ParametricExpressionDeclarator);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
@@ -10572,17 +10571,21 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
 
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
                                                                    NameInfo.getName(),
-                                                                   UsingLoc);
+                                                                   UsingLoc,
+                                                                   TemplateDepth);
 
   if (New) {
     New->setAccess(AS);
     PushOnScopeChains(New, S);
   }
 
-  PushDeclContext(BodyScope, New);
+  return New;
+}
 
-  // Params
-
+bool Sema::CheckParametricExpressionParams(
+                        Scope *BodyScope, bool &NeedsRAII,
+                        ParametricExpressionDecl* New,
+                        MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo) {
   SourceLocation PackLocation{};
   SmallVector<ParmVarDecl*, 16> Params;
   for (auto& P : ParamInfo) {
@@ -10600,8 +10603,7 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
         Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);
         Diag(PackLocation, diag::note_entity_declared_at)
           << "Previous parameter pack";
-        PopDeclContext();
-        return nullptr;
+        return true;
       }
       else {
         PackLocation = PD->getBeginLoc();
@@ -10619,8 +10621,7 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
   }
 
   New->setParams(Context, Params);
-
-  return New;
+  return false;
 }
 
 Decl *Sema::ActOnFinishParametricExpressionDecl(
@@ -10629,8 +10630,6 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
                                     StmtResult CompoundStmtResult) {
   if (!New || CompoundStmtResult.isInvalid())
     return nullptr;
-
-  PopDeclContext();
 
   // Body
 

@@ -2916,9 +2916,10 @@ const PartialDiagnostic &clang::operator<<(const PartialDiagnostic &DB,
 ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
                             DeclarationName DN,
-                            SourceLocation StartL) {
+                            SourceLocation StartL,
+                            unsigned TemplateDepth) {
   ParametricExpressionDecl *New =
-      new (C, DC) ParametricExpressionDecl(DC, DN, StartL);
+      new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth);
   return New;
 }
 
@@ -2930,7 +2931,8 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ParametricExpressionDecl *Old) {
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
-                                           Old->getBeginLoc());
+                                           Old->getBeginLoc(),
+                                           Old->getTemplateDepth());
   New->setAccess(Old->getAccess());
   return New;
 }

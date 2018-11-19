@@ -4983,11 +4983,14 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       }
       break;
     case DeclaratorContext::ParametricExpressionParameterContext: {
+      ParametricExpressionDecl* PD = S.getCurParametricExpressionDecl();
+      assert(PD && "ParametricExpression context must be on the stack.");
+      unsigned TemplateDepth = PD->getTemplateDepth();
       TemplateTypeParmDecl *DummyTemplateParam =
           TemplateTypeParmDecl::Create(
               S.Context, S.Context.getTranslationUnitDecl(),
               /*KeyLoc*/ SourceLocation(), /*NameLoc*/ D.getBeginLoc(),
-              /*TemplateParameterDepth*/ 0, /*AutoParameterPosition*/ 0,
+              TemplateDepth, /*AutoParameterPosition*/ 0,
               /*Identifier*/ nullptr, false, /*IsParameterPack*/ true);
       T = Context.getPackExpansionType(
                           QualType(DummyTemplateParam->getTypeForDecl(), 0),

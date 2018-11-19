@@ -867,7 +867,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   Declarator ParametricExpressionDeclarator(DS, DeclaratorContext::ParametricExpressionContext);
   ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier, D.Name.getBeginLoc());
 
-  // not sure if we want FunctionDeclarationScope here
+  TemplateParameterDepthRAII CurTemplateDepthTracker(TemplateParameterDepth);
   ParseScope PrototypeScope(this,
                             Scope::FunctionPrototypeScope |
                             Scope::FunctionDeclarationScope |
@@ -881,6 +881,12 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   ParsedAttributes attrs(AttrFactory);
   SourceLocation EllipsisLoc;
 
+  ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
+                                               S, getCurScope(), AS,
+                                               UsingLoc, TemplateParameterDepth,
+                                               ParametricExpressionDeclarator);
+  Actions.PushDeclContext(Actions.getCurScope(), New);
+
   if (Tok.isNot(tok::r_paren)) {
     ParseParameterDeclarationClause(ParametricExpressionDeclarator,
                                     attrs, ParamInfo, EllipsisLoc);
@@ -892,11 +898,15 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                              Scope::CompoundStmtScope);
-  ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
-                                                   S, getCurScope(), AS, UsingLoc, NeedsRAII,
-                                                   ParamInfo, ParametricExpressionDeclarator);
+  if (Actions.CheckParametricExpressionParams(
+        getCurScope(), NeedsRAII, New, ParamInfo)) {
+    Actions.PopDeclContext(); // DeclContextRAII would be nice
+    return nullptr;
+  }
+
   StmtResult CSResult = ParseCompoundStatement();
   Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New, NeedsRAII, CSResult);
+  Actions.PopDeclContext();
   BodyScope.Exit();
   Actions.PopFunctionScopeInfo();
 

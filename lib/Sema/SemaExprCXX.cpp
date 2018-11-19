@@ -8022,14 +8022,15 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     }
   }
 
-  // TODO Do we need to provide TemplateArgs to the calls
-  //      to SubstStmt and SubstExpr?
-  //
-  //      Do we need to provide MultiLevelTemplateArgumentList
-  //      to SubstStmt/SubstExpr?
+  //MultiLevelTemplateArgumentList TemplateArgs = {};
+  TemplateArgumentList Innermost(TemplateArgumentList::OnStack, {});
+  MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
+                                                                D, &Innermost);
+  //TemplateArgs.addOuterTemplateArguments(None);
+  //TemplateArgs.addOuterTemplateArguments(getTemplateInstantiationArgs(D));
 
   if (CompoundStmt::classof(Output)) {
-    StmtResult CSResult = SubstStmt(Output, {});
+    StmtResult CSResult = SubstStmt(Output, TemplateArgs);
     if (CSResult.isInvalid())
       return ExprError();
 
@@ -8037,7 +8038,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
                                              CSResult.getAs<CompoundStmt>(),
                                              NewParmVarDecls);
   } else {
-    return SubstExpr(static_cast<Expr*>(Output), {});
+    return SubstExpr(static_cast<Expr*>(Output), TemplateArgs);
   }
 }
 

@@ -3952,16 +3952,20 @@ class ParametricExpressionDecl : public NamedDecl,
   Stmt *Body = nullptr;
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
+  unsigned TemplateDepth;
 
   ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
-                           SourceLocation StartL)
+                           SourceLocation StartL,
+                           unsigned TPDepth)
     : NamedDecl(ParametricExpression, DC, StartL, DN)
-    , DeclContext(ParametricExpression) {}
+    , DeclContext(ParametricExpression)
+    , TemplateDepth(TPDepth) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           DeclarationName DN,
-                                          SourceLocation StartL);
+                                          SourceLocation StartL,
+                                          unsigned TemplateDepth);
 
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           ParametricExpressionDecl* Old);
@@ -3976,6 +3980,10 @@ public:
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
   unsigned getNumParams() const { return NumParams; }
+
+  unsigned getTemplateDepth() const {
+    return TemplateDepth;
+  }
 
   // ArrayRef interface to parameters.
   ArrayRef<ParmVarDecl *> parameters() const {
