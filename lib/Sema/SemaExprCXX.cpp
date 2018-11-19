@@ -7953,16 +7953,7 @@ public:
 
   // Don't visit enclosed scopes
 
-  bool VisitLambdaExpr(LambdaExpr *) {
-    return true;
-  }
-
   bool VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
-    return true;
-  }
-
-  bool VisitReturnStmt(ReturnStmt *) {
-    llvm_unreachable("ParametricExpressionReturnStmtVisitor in invalid scope");
     return true;
   }
 };
@@ -8050,6 +8041,14 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
   ExprValueKind VK = R.getResultType()->isReferenceType() ? VK_LValue :
                                                             VK_RValue;
   QualType T = R.getResultType().getNonReferenceType();
+
+  // If the visitor found no return statements
+  // then it will still be DependentTy so we
+  // can assume an impicit return of void.
+  if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr()) {
+    T = Context.VoidTy;
+  }
+
   return ParametricExpressionCallExpr::Create(Context, BeginLoc, Body, T,
                                               VK, Params);
 }

@@ -3458,7 +3458,7 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
 }
 
 StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp) {
-  if (getCurParametricExpressionDecl()) {
+  if (getCurParametricExpressionDecl() && !getCurLambda()) {
     return BuildParametricExpressionReturnStmt(ReturnLoc, RetValExp);
   }
 
