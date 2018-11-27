@@ -4693,6 +4693,7 @@ public:
                         SourceLocation LParenLoc);
   ExprResult BuildParametricExpressionCallExpr(
                         SourceLocation BeginLoc, CompoundStmt *Body,
+                        Expr *BaseExpr,
                         ArrayRef<ParmVarDecl*> Params);
   ParmVarDecl *BuildParametricExpressionParam(
                         ParmVarDecl *OldParam, Expr *ArgExpr);

@@ -894,7 +894,13 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   T.consumeClose();
   PrototypeScope.Exit();
 
-  bool NeedsRAII = false;
+  // At the very least we need an AST node to wrap
+  // the expression so we can load `this` in CodeGen.
+  // For now, we assume it requires RAII if it is a
+  // non-static member.
+  CXXRecordDecl *ThisContext = New->getThisContext();
+  bool NeedsRAII = ThisContext != nullptr;
+
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                              Scope::CompoundStmtScope);
@@ -904,6 +910,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
     return nullptr;
   }
 
+  Sema::CXXThisScopeRAII ThisScope(Actions, ThisContext, 0);
   StmtResult CSResult = ParseCompoundStatement();
   Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New, NeedsRAII, CSResult);
   Actions.PopDeclContext();

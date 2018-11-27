@@ -2273,17 +2273,18 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
 llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
                                           const ParametricExpressionCallExpr* E,
                                           AggValueSlot AggSlot) {
-  // TODO make RAII object to handle ReturnValue, NumReturnExprs, et al.
-  const Decl *OldCurCodeDecl = CurCodeDecl;
-  Address OldReturnValue = ReturnValue;
-  unsigned OldNumReturnExprs = NumReturnExprs;
-  unsigned OldNumSimpleReturnExprs = NumSimpleReturnExprs;
-  NumReturnExprs = 0;
-  NumSimpleReturnExprs = 0;
-  JumpDest OldReturnBlock = ReturnBlock;
+  ParametricExpressionCallExprScope PScope(*this);
 
   QualType RetTy = E->getType();
   CompoundStmt *Body = E->getBody();
+  Expr *BaseExpr = E->getBaseExpr();
+
+  if (BaseExpr) {
+    RValue BaseExprResult = EmitAnyExprToTemp(BaseExpr);
+    CXXThisValue = BaseExprResult.isScalar()
+                            ? BaseExprResult.getScalarVal()
+                            : BaseExprResult.getAggregatePointer();
+  }
   /*
   PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body->getBeginLoc(),
                              "LLVM IR generation of parametric expression call ('{}')");
@@ -2310,18 +2311,11 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   EmitCompoundStmtWithoutScope(*Body);
   EmitReturnBlock();
 
-  CurCodeDecl = OldCurCodeDecl;
-  Address ResultValue = ReturnValue;
-  ReturnValue = OldReturnValue;
-  NumReturnExprs = OldNumReturnExprs;
-  NumSimpleReturnExprs = OldNumSimpleReturnExprs;
-  ReturnBlock = OldReturnBlock;
-
   if (hasAggregateEvaluationKind(RetTy)) {
     // ReturnStmt did the work already
     return nullptr;
   } else {
-    return EmitLoadOfScalar(MakeAddrLValue(ResultValue, RetTy),
+    return EmitLoadOfScalar(MakeAddrLValue(ReturnValue, RetTy),
                             E->getBeginLoc());
   }
 }

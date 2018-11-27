@@ -7964,7 +7964,9 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
                                                    SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
-  ParametricExpressionDecl *D = static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
+  ParametricExpressionDecl *D =
+    static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
+  Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Fn)->getBaseExpr();
 
   // We already know there is at most one param pack
   int PackSize = ArgExprs.size() - D->getNumParams() + 1;
@@ -8013,12 +8015,11 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     }
   }
 
-  //MultiLevelTemplateArgumentList TemplateArgs = {};
   TemplateArgumentList Innermost(TemplateArgumentList::OnStack, {});
   MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
                                                                 D, &Innermost);
-  //TemplateArgs.addOuterTemplateArguments(None);
-  //TemplateArgs.addOuterTemplateArguments(getTemplateInstantiationArgs(D));
+
+  Sema::CXXThisScopeRAII ThisScope(*this, D->getThisContext(), 0);
 
   if (CompoundStmt::classof(Output)) {
     StmtResult CSResult = SubstStmt(Output, TemplateArgs);
@@ -8027,6 +8028,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
 
     return BuildParametricExpressionCallExpr(LParenLoc,
                                              CSResult.getAs<CompoundStmt>(),
+                                             BaseExpr,
                                              NewParmVarDecls);
   } else {
     return SubstExpr(static_cast<Expr*>(Output), TemplateArgs);
@@ -8034,7 +8036,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
 }
 
 ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
-                                             CompoundStmt *Body,
+                                             CompoundStmt *Body, Expr *BaseExpr,
                                              ArrayRef<ParmVarDecl *> Params) {
   ParametricExpressionReturnStmtVisitor R(*this);
   R.TraverseStmt(Body);
@@ -8049,8 +8051,8 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
     T = Context.VoidTy;
   }
 
-  return ParametricExpressionCallExpr::Create(Context, BeginLoc, Body, T,
-                                              VK, Params);
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc, Body,
+                                              BaseExpr, T, VK, Params);
 }
 
 // used in ActOnParametricExpression and

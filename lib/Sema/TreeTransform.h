@@ -3260,10 +3260,13 @@ public:
   // Build a new call to a parametric expression
   //
   // By default, just creates a new one with the given inputs
-  ExprResult RebuildParametricExpressionCallExpr(SourceLocation BeginLoc,
-                                                 CompoundStmt *Body,
-                                                 ArrayRef<ParmVarDecl *> Params) {
-    return SemaRef.BuildParametricExpressionCallExpr(BeginLoc, Body, Params);
+  ExprResult RebuildParametricExpressionCallExpr(
+                                               SourceLocation BeginLoc,
+                                               Expr* BaseExpr,
+                                               CompoundStmt *Body,
+                                               ArrayRef<ParmVarDecl *> Params) {
+    return SemaRef.BuildParametricExpressionCallExpr(BeginLoc, Body, BaseExpr,
+                                                     Params);
   }
 
 private:
@@ -12831,6 +12834,18 @@ template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformParametricExpressionIdExpr(
     ParametricExpressionIdExpr *E) {
+
+  ExprResult Base = getDerived().TransformExpr(E->getBaseExpr());
+  if (Base.isInvalid())
+    return ExprError();
+
+  if (getDerived().AlwaysRebuild() || Base.get() != E->getBaseExpr()) {
+    return new (SemaRef.Context) ParametricExpressionIdExpr(
+                                                    E->getBeginLoc(),
+                                                    E->getDefinitionDecl(),
+                                                    Base.get());
+  }
+
   return E;
 }
 
@@ -12852,7 +12867,8 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
         NewInit.get() != PD->getInit()
     ) {
       ParamChanged = true;
-      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(PD, NewInit.get());
+      ParmVarDecl *NewPD = getSema().BuildParametricExpressionParam(
+                                                          PD, NewInit.get());
       if (!NewPD) {
         return ExprError();
       }
@@ -12863,6 +12879,12 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
     }
   }
 
+  // Transform the BaseExpr (which may be nullptr)
+
+  ExprResult BEResult = getDerived().TransformExpr(E->getBaseExpr());
+  if (BEResult.isInvalid())
+    return ExprError();
+
   // Transform the Body
 
   StmtResult CSResult = getDerived().TransformStmt(E->getBody());
@@ -12870,13 +12892,15 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
     return ExprError();
 
   if (!getDerived().AlwaysRebuild() && !ParamChanged &&
+      BEResult.get() == E->getBaseExpr() &&
       CSResult.get() == E->getBody()) {
     return E;
   }
 
   return RebuildParametricExpressionCallExpr(E->getBeginLoc(),
-                                            CSResult.getAs<CompoundStmt>(),
-                                            NewParmVarDecls);
+                                             BEResult.get(),
+                                             CSResult.getAs<CompoundStmt>(),
+                                             NewParmVarDecls);
 }
 
 } // end namespace clang

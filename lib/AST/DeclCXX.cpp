@@ -2917,9 +2917,11 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             ASTContext &C, DeclContext *DC,
                             DeclarationName DN,
                             SourceLocation StartL,
-                            unsigned TemplateDepth) {
+                            unsigned TemplateDepth,
+                            bool IsStatic) {
   ParametricExpressionDecl *New =
-      new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth);
+      new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth,
+                                           IsStatic);
   return New;
 }
 
@@ -2932,7 +2934,8 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
                                            Old->getBeginLoc(),
-                                           Old->getTemplateDepth());
+                                           Old->getTemplateDepth(),
+                                           Old->isStatic());
   New->setAccess(Old->getAccess());
   return New;
 }

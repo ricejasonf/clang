@@ -3953,19 +3953,23 @@ class ParametricExpressionDecl : public NamedDecl,
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
   unsigned TemplateDepth;
+  bool IsStatic;
 
   ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
                            SourceLocation StartL,
-                           unsigned TPDepth)
+                           unsigned TPDepth,
+                           bool IsStatic)
     : NamedDecl(ParametricExpression, DC, StartL, DN)
     , DeclContext(ParametricExpression)
-    , TemplateDepth(TPDepth) {}
+    , TemplateDepth(TPDepth)
+    , IsStatic(IsStatic) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           DeclarationName DN,
                                           SourceLocation StartL,
-                                          unsigned TemplateDepth);
+                                          unsigned TemplateDepth,
+                                          bool IsStatic = false);
 
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           ParametricExpressionDecl* Old);
@@ -3976,6 +3980,19 @@ public:
 
   Stmt* getBody() const {
     return Body;
+  }
+
+  bool isStatic() const {
+    return IsStatic;
+  }
+
+  // Returns parent class decl if this
+  // declaration has an implicit `this`
+  // or nullptr
+  CXXRecordDecl *getThisContext() {
+    if (!IsStatic)
+      return dyn_cast<CXXRecordDecl>(getParent());
+    return nullptr;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);

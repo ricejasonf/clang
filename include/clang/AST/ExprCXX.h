@@ -4796,15 +4796,20 @@ public:
 class ParametricExpressionIdExpr : public Expr {
   SourceLocation BeginLoc;
   ParametricExpressionDecl *DefinitionDecl;
+  Expr *BaseExpr;
 
 public:
-  ParametricExpressionIdExpr(SourceLocation BL, ParametricExpressionDecl *D)
+  ParametricExpressionIdExpr(SourceLocation BL, ParametricExpressionDecl *D,
+                             Expr* Base = nullptr)
     : Expr(ParametricExpressionIdExprClass, QualType(), VK_RValue, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL),
-      DefinitionDecl(D) {}
+      DefinitionDecl(D),
+      BaseExpr(Base) {}
 
   ParametricExpressionDecl *getDefinitionDecl() { return DefinitionDecl; }
+
+  Expr *getBaseExpr() { return BaseExpr; };
 
   // Iterators
   child_range children() {
@@ -4828,26 +4833,33 @@ class ParametricExpressionCallExpr : public Expr {
   unsigned NumParams = 0;
   ParmVarDecl** ParamInfo;
   Stmt **Children;
-  // The CompoundStmt Body is in Children[0]
-  // The Param Init Exprs are in Children[I + 1]
+  // The BaseExpr is in          Children[0]
+  // The CompoundStmt Body is in Children[1]
+  // The Param Init Exprs are in Children[2] to Children[2 + NumParams]
 
-  ParametricExpressionCallExpr(SourceLocation BL, CompoundStmt *B,
-                               QualType QT, ExprValueKind VK)
+  ParametricExpressionCallExpr(SourceLocation BL, QualType QT, ExprValueKind VK)
     : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL) {}
 public:
   static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
-                                              CompoundStmt *B, QualType QT,
-                                              ExprValueKind VK,
+                                              CompoundStmt *B, Expr* BaseExpr,
+                                              QualType QT, ExprValueKind VK,
                                               ArrayRef<ParmVarDecl *> Params);
+  Expr *getBaseExpr() const {
+    return static_cast<Expr*>(Children[0]);
+  }
+
+  void setBaseExpr(Expr* BaseExpr) {
+    Children[0] = BaseExpr;
+  }
 
   CompoundStmt *getBody() const {
-    return static_cast<CompoundStmt*>(Children[0]);
+    return static_cast<CompoundStmt*>(Children[1]);
   }
 
   void setBody(CompoundStmt *Body) {
-    Children[0] = Body;
+    Children[2] = Body;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
@@ -4862,19 +4874,19 @@ public:
   }
 
   ArrayRef<Expr *> init_expressions() const {
-    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
+    return {reinterpret_cast<Expr**>(Children) + 2, NumParams};
   }
   MutableArrayRef<Expr *> init_expressions() {
-    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
+    return {reinterpret_cast<Expr**>(Children) + 2, NumParams};
   }
 
   // Iterators
   child_range children() {
-    if (NumParams > 0) {
-      return child_range(Children, Children + 1 + NumParams);
+    if (getBaseExpr()) {
+      return child_range(Children, Children + 2 + NumParams);
     }
     else {
-      return child_range(Children, Children + 1);
+      return child_range(Children + 1, Children + 2 + NumParams);
     }
   }
 

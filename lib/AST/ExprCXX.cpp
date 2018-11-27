@@ -1452,11 +1452,12 @@ void ArrayTypeTraitExpr::anchor() {}
 
 
 ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
-                                        ASTContext &C,
-                                        SourceLocation BL, CompoundStmt *B,
+                                        ASTContext &C, SourceLocation BL,
+                                        CompoundStmt *Body, Expr *BaseExpr,
                                         QualType QT, ExprValueKind VK,
                                         ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(BL, B, QT, VK);
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(
+                                                                  BL, QT, VK);
   New->NumParams = Params.size();
 
   if (!Params.empty()) {
@@ -1464,11 +1465,12 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
     std::copy(Params.begin(), Params.end(), New->ParamInfo);
   }
 
-  New->Children = new (C) Stmt*[Params.size() + 1];
+  New->Children = new (C) Stmt*[Params.size() + 2];
 
-  New->Children[0] = B;
+  New->Children[0] = BaseExpr;
+  New->Children[1] = Body;
   for (unsigned i = 0; i < Params.size(); i++) {
-    New->Children[i + 1] = Params[i]->getInit();
+    New->Children[i + 2] = Params[i]->getInit();
   }
 
   return New;
