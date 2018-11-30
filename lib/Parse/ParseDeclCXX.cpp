@@ -836,25 +836,16 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
     return nullptr;
   }
 
-  // TODO The declarator context should be DeclaratorContext::ParametricExpressionContext
+  // TODO The declarator context should be 
+  //      DeclaratorContext::ParametricExpressionContext
 
   if (!getLangOpts().CPlusPlus2a) {
-    Diag(Tok.getLocation(), diag::warn_cxx2a_compat_parametric_expression_declaration);
+    Diag(Tok.getLocation(),
+         diag::warn_cxx2a_compat_parametric_expression_declaration);
   }
 
-  // TODO support operator overloads
-  // Name must be an identifier.
-  if (D.Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
-    Diag(D.Name.StartLocation, diag::err_alias_declaration_not_identifier);
-    // No removal fixit: can't recover from this.
-    return nullptr;
-  } else if (D.TypenameLoc.isValid()) {
-    Diag(D.TypenameLoc, diag::err_alias_declaration_not_identifier)
-        << FixItHint::CreateRemoval(SourceRange(
-               D.TypenameLoc,
-               D.SS.isNotEmpty() ? D.SS.getEndLoc() : D.TypenameLoc));
-  } else if (D.SS.isNotEmpty()) {
-    Diag(D.SS.getBeginLoc(), diag::err_alias_declaration_not_identifier)
+  if (D.SS.isNotEmpty()) {
+    Diag(D.SS.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(D.SS.getRange());
   }
 
@@ -864,8 +855,37 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   }
 
   DeclSpec DS(AttrFactory);
-  Declarator ParametricExpressionDeclarator(DS, DeclaratorContext::ParametricExpressionContext);
-  ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier, D.Name.getBeginLoc());
+  Declarator ParametricExpressionDeclarator(
+      DS, DeclaratorContext::ParametricExpressionContext);
+
+  if (D.Name.getKind() == UnqualifiedIdKind::IK_Identifier) {
+    ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier,
+                                                 D.Name.getBeginLoc());
+  }
+  else if (D.Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
+    Diag(D.SS.getBeginLoc(), diag::err_parametric_expression_name_invalid)
+      << FixItHint::CreateRemoval(D.SS.getRange());
+    return nullptr;
+#if 0 // TODO reenable operator ids
+    unsigned *RawSymbolLocations = D.Name.OperatorFunctionId.SymbolLocations;
+    SourceLocation SymbolLocations[3] = {
+      SourceLocation::getFromRawEncoding(RawSymbolLocations[0]),
+      SourceLocation::getFromRawEncoding(RawSymbolLocations[1]),
+      SourceLocation::getFromRawEncoding(RawSymbolLocations[2])};
+    ParametricExpressionDeclarator.getName().setOperatorFunctionId(
+                                            D.Name.getBeginLoc(),
+                                            D.Name.OperatorFunctionId.Operator,
+                                            SymbolLocations
+                                          );
+#endif
+  }
+  else {
+    // TODO use a better diagnostic message for an invalid id
+    Diag(D.SS.getBeginLoc(), diag::err_alias_declaration_not_identifier)
+      << FixItHint::CreateRemoval(D.SS.getRange());
+    // No removal fixit: can't recover from this.
+    return nullptr;
+  }
 
   TemplateParameterDepthRAII CurTemplateDepthTracker(TemplateParameterDepth);
   ParseScope PrototypeScope(this,
