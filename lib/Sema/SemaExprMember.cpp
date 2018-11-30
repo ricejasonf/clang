@@ -1155,8 +1155,8 @@ Sema::BuildMemberReferenceExpr(Expr *BaseExpr, QualType BaseExprType,
   }
   if (ParametricExpressionDecl *PDecl
       = dyn_cast<ParametricExpressionDecl>(MemberDecl)) {
-    return new (Context) ParametricExpressionIdExpr(MemberNameInfo.getLoc(),
-                                                    PDecl, BaseExpr);
+    return ParametricExpressionIdExpr::Create(Context, MemberNameInfo.getLoc(),
+                                             PDecl, BaseExpr);
   }
 
   // We found something that we didn't expect. Complain.

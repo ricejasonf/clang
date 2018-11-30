@@ -4798,14 +4798,21 @@ class ParametricExpressionIdExpr : public Expr {
   ParametricExpressionDecl *DefinitionDecl;
   Expr *BaseExpr;
 
-public:
-  ParametricExpressionIdExpr(SourceLocation BL, ParametricExpressionDecl *D,
+  ParametricExpressionIdExpr(SourceLocation BL, QualType QT, 
+                             ParametricExpressionDecl *D,
                              Expr* Base = nullptr)
-    : Expr(ParametricExpressionIdExprClass, QualType(), VK_RValue, OK_Ordinary,
+    : Expr(ParametricExpressionIdExprClass, QT, VK_RValue, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL),
       DefinitionDecl(D),
       BaseExpr(Base) {}
+
+public:
+  static ParametricExpressionIdExpr *Create(ASTContext &C, SourceLocation BL,
+                                            ParametricExpressionDecl *D,
+                                            Expr* Base = nullptr) {
+    return new (C) ParametricExpressionIdExpr(BL, C.ParametricExpressionIdTy, D, Base);
+  }
 
   ParametricExpressionDecl *getDefinitionDecl() { return DefinitionDecl; }
 

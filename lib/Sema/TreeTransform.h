@@ -12840,10 +12840,10 @@ TreeTransform<Derived>::TransformParametricExpressionIdExpr(
     return ExprError();
 
   if (getDerived().AlwaysRebuild() || Base.get() != E->getBaseExpr()) {
-    return new (SemaRef.Context) ParametricExpressionIdExpr(
-                                                    E->getBeginLoc(),
-                                                    E->getDefinitionDecl(),
-                                                    Base.get());
+    return ParametricExpressionIdExpr::Create(SemaRef.Context,
+                                              E->getBeginLoc(),
+                                              E->getDefinitionDecl(),
+                                              Base.get());
   }
 
   return E;

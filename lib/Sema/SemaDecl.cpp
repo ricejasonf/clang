@@ -1043,7 +1043,7 @@ Corrected:
 
   if (NextToken.is(tok::l_paren) &&
       Result.getAsSingle<ParametricExpressionDecl>()) {
-    return ExprResult(new (Context) ParametricExpressionIdExpr(NameLoc,
+    return ExprResult(ParametricExpressionIdExpr::Create(Context, NameLoc,
         Result.getAsSingle<ParametricExpressionDecl>()));
   }
 

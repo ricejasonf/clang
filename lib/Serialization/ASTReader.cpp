@@ -7009,6 +7009,9 @@ QualType ASTReader::GetType(TypeID ID) {
     case PREDEF_TYPE_OMP_ARRAY_SECTION:
       T = Context.OMPArraySectionTy;
       break;
+    case PREDEF_TYPE_PARAMETRIC_EXPRESSION_ID:
+      T = Context.ParametricExpressionIdTy;
+      break;
     }
 
     assert(!T.isNull() && "Unknown predefined type");

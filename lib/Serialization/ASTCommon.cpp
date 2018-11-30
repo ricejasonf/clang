@@ -234,6 +234,9 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
   case BuiltinType::OMPArraySection:
     ID = PREDEF_TYPE_OMP_ARRAY_SECTION;
     break;
+  case BuiltinType::ParametricExpressionId:
+    ID = PREDEF_TYPE_PARAMETRIC_EXPRESSION_ID;
+    break;
   }
 
   return TypeIdx(ID);

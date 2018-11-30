@@ -2118,9 +2118,10 @@ Sema::ActOnIdExpression(Scope *S, CXXScopeSpec &SS,
   if (R.isAmbiguous())
     return ExprError();
 
-  if (HasTrailingLParen && R.getAsSingle<ParametricExpressionDecl>()) {
-    return new (Context) ParametricExpressionIdExpr(NameLoc,
-        R.getAsSingle<ParametricExpressionDecl>());
+  if (R.getAsSingle<ParametricExpressionDecl>()) {
+    return ParametricExpressionIdExpr::Create(
+                          Context, NameLoc,
+                          R.getAsSingle<ParametricExpressionDecl>());
   }
 
   // This could be an implicitly declared function reference (legal in C90,
@@ -5068,6 +5069,11 @@ static bool isPlaceholderToRemoveAsArg(QualType type) {
   // We cannot lower out overload sets; they might validly be resolved
   // by the call machinery.
   case BuiltinType::Overload:
+    return false;
+
+  // ParametricExpressionId can be valid arguments in calls
+  // to parametric expressions
+  case BuiltinType::ParametricExpressionId:
     return false;
 
   // Unbridged casts in ARC can be handled in some call positions and
@@ -16427,6 +16433,13 @@ ExprResult Sema::CheckPlaceholderExpr(Expr *E) {
     }
     tryToRecoverWithCall(result, PD,
                          /*complain*/ true);
+    return result;
+  }
+
+  // Parametric Expression Ids
+  case BuiltinType::ParametricExpressionId: {
+    ExprResult result = E;
+    Diag(E->getBeginLoc(), diag::err_parametric_expression_id);
     return result;
   }
 
