@@ -10573,11 +10573,9 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
                                                                    NameInfo.getName(),
                                                                    UsingLoc,
                                                                    TemplateDepth);
-
-  if (New) {
-    New->setAccess(AS);
-    PushOnScopeChains(New, S);
-  }
+  assert(New && "ParametricExpressionDecl::Create failed??");
+  New->setAccess(AS);
+  PushOnScopeChains(New, S);
 
   return New;
 }
@@ -10652,9 +10650,9 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
       Body = CS;
     }
   } else {
-    // Doesn't need RAII and the body is empty
-    // TODO Create an Expr that return void (somehow)
-    assert(false && "Empty parametric expression definition not supported yet.");
+    // Doesn't need RAII and the body is empty.
+    // This could just be a void expr
+    Body = CS;
   }
 
   // Body isn't necessarily a compound statement so we will see

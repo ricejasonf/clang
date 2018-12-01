@@ -4319,6 +4319,10 @@ StmtResult Sema::BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
     return StmtError();
   }
 
+  if (CorrectDelayedTyposInExpr(RetValExp).isInvalid()) {
+    return StmtError();
+  }
+
   ParametricExpressionReturnStmt *New =
     new (Context) ParametricExpressionReturnStmt(ReturnLoc, RetValExp,
                                                  NRVOCandidate);

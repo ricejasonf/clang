@@ -7983,6 +7983,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
       << (((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0);
     // TODO note the declaration
+    return ExprError();
   }
 
   Stmt *Output = D->getBody();
@@ -8002,6 +8003,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
       for (int J = 0; J < PackSize; J++) {
         assert(I < ArgExprs.size() && "ArgExprs index out of range");
         ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+        if (!New) return ExprError();
         NewParmVarDecls[I] = New;
         Scope.InstantiatedLocalPackArg(P, New);
         ++I;
@@ -8009,6 +8011,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     } else {
       assert(I < ArgExprs.size() && "ArgExprs index out of range");
       ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+      if (!New) return ExprError();
       NewParmVarDecls[I] = New;
       Scope.InstantiatedLocal(P, New);
       ++I;
@@ -8062,6 +8065,9 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExp
   if (Old->isUsingSpecified()) {
     // The type could be an abstract type
     ArgTy = ArgExpr->getType();
+  } else if (ArgExpr->getType()->isPlaceholderType()) {
+    CheckPlaceholderExpr(ArgExpr);
+    return nullptr;
   } else if (ArgExpr->isRValue()) {
     ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
   } else {
@@ -8086,7 +8092,7 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExp
       return nullptr;
     AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
   } else {
-    // Using Params can be any kind of part of an expression
+    // Using Params can contain things like packs and overloaded function ids
     New->setUsingSpecified(true);
     New->setInit(ArgExpr);
   }

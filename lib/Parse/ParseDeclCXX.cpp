@@ -905,6 +905,9 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
                                                S, getCurScope(), AS,
                                                UsingLoc, TemplateParameterDepth,
                                                ParametricExpressionDeclarator);
+  if (!New)
+    return nullptr;
+
   Actions.PushDeclContext(Actions.getCurScope(), New);
 
   if (Tok.isNot(tok::r_paren)) {
