@@ -4968,9 +4968,12 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
                "found declaration pack but not pack expanding");
         typedef LocalInstantiationScope::DeclArgumentPack DeclArgumentPack;
         return cast<NamedDecl>((*Found->get<DeclArgumentPack *>())[PackIdx]);
+      } else if (ExpandingExprAlias) {
+        // When expanding `using` vars some exprs might refer to the
+        // instantiatiated declarations from previous instantiations
+        return D;
       }
     }
-
     // If we're performing a partial substitution during template argument
     // deduction, we may not have values for template parameters yet. They
     // just map to themselves.

@@ -7989,7 +7989,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   Stmt *Output = D->getBody();
   assert(Output && "ParametricExpressionDecl Output is nullptr");
 
-  LocalInstantiationScope Scope(*this);
+  LocalInstantiationScope Scope(*this, /*CombineWithOuterScope=*/true);
   InstantiatingTemplate Inst(*this, LParenLoc, D);
   llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls(ArgExprs.size());
 

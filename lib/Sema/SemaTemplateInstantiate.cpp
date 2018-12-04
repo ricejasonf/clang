@@ -1316,6 +1316,11 @@ TemplateInstantiator::TransformSubstNonTypeTemplateParmPackExpr(
 ExprResult
 TemplateInstantiator::RebuildParmVarDeclRefExpr(ParmVarDecl *PD,
                                                 SourceLocation Loc) {
+  if (PD->isUsingSpecified() && PD->hasInit()) {
+    Sema::ExpandingExprAliasRAII ExpandingExprAlias(SemaRef);
+    return SemaRef.SubstExpr(PD->getInit(), {});
+  }
+
   DeclarationNameInfo NameInfo(PD->getDeclName(), Loc);
   return getSema().BuildDeclarationNameExpr(CXXScopeSpec(), NameInfo, PD);
 }
@@ -2922,7 +2927,11 @@ LocalInstantiationScope::findInstantiationOf(const Decl *D) {
   // If we didn't find the decl, then we either have a sema bug, or we have a
   // forward reference to a label declaration.  Return null to indicate that
   // we have an uninstantiated label.
-  assert(isa<LabelDecl>(D) && "declaration not instantiated in this scope");
+  // Or...
+  // When expanding `using` vars some exprs might refer to the
+  // instantiatiated declarations from previous instantiations
+  assert((isa<LabelDecl>(D) || SemaRef.ExpandingExprAlias) &&
+      "declaration not instantiated in this scope");
   return nullptr;
 }
 
