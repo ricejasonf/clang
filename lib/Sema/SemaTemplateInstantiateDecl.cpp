@@ -2556,36 +2556,24 @@ Decl *TemplateDeclInstantiator::VisitConstructorUsingShadowDecl(
 
 Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
                                               ParametricExpressionDecl *D) {
-  ParametricExpressionDecl *New = ParametricExpressionDecl::Create(SemaRef.Context,
-                                                                   Owner, D);
-  New->setBody(D->getBody());
-  New->setParams(SemaRef.Context, D->parameters());
-#if 0
+  ParametricExpressionDecl *New = ParametricExpressionDecl::Create(
+                                                SemaRef.Context, Owner, D);
   // Enter the scope of this instantiation. We don't use
   // PushDeclContext because we don't have a scope.
   Sema::ContextRAII savedContext(SemaRef, New);
-  LocalInstantiationScope Scope(SemaRef);
+  LocalInstantiationScope Scope(SemaRef, /*CombineWithOuterScope=*/true);
+  Sema::InstantiatingTemplate Inst(SemaRef, New->getBeginLoc(), New);
+  Sema::CXXThisScopeRAII ThisScope(SemaRef, New->getThisContext(), 0);
 
-  MultiLevelTemplateArgumentList DummyArgsLayer(TemplateArgs);
-  // We don't have args yet
-  DummyArgsLayer.addOuterTemplateArguments(None);
+  // Providing template args was causing pack expansion weirdness
+  MultiLevelTemplateArgumentList
+  LocalTemplateArgs = {};
 
-  // Params - just clone them with the new Decl as the DeclContext
+  // Params
   SmallVector<ParmVarDecl*, 16> NewParams{};
   for (ParmVarDecl *OldParm : D->parameters()) {
-    TypeSourceInfo *NewDI = OldParm->getTypeSourceInfo();
-    ParmVarDecl *NewParm = ParmVarDecl::Create(SemaRef.Context,
-                                               New,
-                                               OldParm->getInnerLocStart(),
-                                               OldParm->getLocation(),
-                                               OldParm->getIdentifier(),
-                                               NewDI->getType(),
-                                               NewDI,
-                                               OldParm->getStorageClass(),
-                                               /* DefArg */ nullptr);
-    NewParm->setUsingSpecified(OldParm->isUsingSpecified());
-    // TODO enable constexpr params
-    // NewParm->setConstexpr(OldParm->isConstexpr());
+    ParmVarDecl *NewParm = SemaRef.BuildParametricExpressionParam(
+                                                        OldParm, nullptr);
     NewParams.push_back(NewParm);
     Scope.InstantiatedLocal(OldParm, NewParm);
   }
@@ -2595,19 +2583,18 @@ Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
   Stmt* Body;
   if (isa<CompoundStmt>(D->getBody())) {
     StmtResult BodyResult = SemaRef.SubstStmt(D->getBody(),
-                                              DummyArgsLayer);
+                                              LocalTemplateArgs);
     if (BodyResult.isInvalid())
       return nullptr;
     Body = BodyResult.get();
   } else {
     ExprResult BodyResult = SemaRef.SubstExpr(cast<Expr>(D->getBody()),
-                                              DummyArgsLayer);
+                                              LocalTemplateArgs);
     if (BodyResult.isInvalid())
       return nullptr;
     Body = BodyResult.get();
   }
   New->setBody(Body);
-#endif
 
   Owner->addDecl(New);
   return New;

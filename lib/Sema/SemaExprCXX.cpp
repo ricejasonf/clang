@@ -8062,7 +8062,9 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
 // TreeTransform<Derived>::TransformParametricExpressionCallExpr
 ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExpr) {
   QualType ArgTy;
-  if (Old->isUsingSpecified()) {
+  if (!ArgExpr) {
+    ArgTy = Old->getType();
+  } else if (Old->isUsingSpecified()) {
     // The type could be an abstract type
     ArgTy = ArgExpr->getType();
   } else if (ArgExpr->getType()->isPlaceholderType()) {
@@ -8086,7 +8088,7 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExp
   // FIXME ParmVarDecls cannot be constexpr yet
   // New->setConstexpr(Old->isConstexpr());
 
-  if (!Old->isUsingSpecified()) {
+  if (ArgExpr && !Old->isUsingSpecified()) {
     ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);
     if (InitExprResult.isInvalid())
       return nullptr;
