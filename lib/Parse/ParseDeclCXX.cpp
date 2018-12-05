@@ -688,6 +688,7 @@ Parser::ParseUsingDeclaration(DeclaratorContext Context,
     return nullptr;
   }
 
+#if 0 // TODO Remove
   // parametric-expression
   if (Tok.is(tok::l_paren)) {
     if (InvalidDeclarator) {
@@ -700,6 +701,7 @@ Parser::ParseUsingDeclaration(DeclaratorContext Context,
         UsingLoc, D, DeclEnd, AS, &DeclFromDeclSpec);
     return Actions.ConvertDeclToDeclGroup(AD, DeclFromDeclSpec);
   }
+#endif
 
   SmallVector<Decl *, 8> DeclsInGroup;
   while (true) {
@@ -828,64 +830,81 @@ Decl *Parser::ParseAliasDeclarationAfterDeclarator(
                                        DeclFromDeclSpec);
 }
 
-Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
-    SourceLocation UsingLoc, UsingDeclarator &D, SourceLocation &DeclEnd,
-    AccessSpecifier AS, Decl **OwnedType) {
-  Scope* S = getCurScope();
-  if (ExpectAndConsume(tok::l_paren)) {
-    return nullptr;
-  }
-
-  // TODO The declarator context should be 
-  //      DeclaratorContext::ParametricExpressionContext
-
+Parser::DeclGroupPtrTy
+Parser::ParseParametricExpressionDeclaration(
+                              DeclaratorContext Context,
+                              AccessSpecifier AS) {
   if (!getLangOpts().CPlusPlus2a) {
     Diag(Tok.getLocation(),
          diag::warn_cxx2a_compat_parametric_expression_declaration);
   }
 
-  if (D.SS.isNotEmpty()) {
-    Diag(D.SS.getBeginLoc(), diag::err_parametric_expression_name_invalid)
-      << FixItHint::CreateRemoval(D.SS.getRange());
+  // Declaration Specifiers
+  //
+  // must be `using` or `static using` for static members
+  // Consider adding this to ParseDeclarationSpecifiers.
+
+  SourceLocation BeginLoc;
+
+  // consume optional kw_static specifier for class members
+  bool IsStatic = TryConsumeToken(tok::kw_static, BeginLoc);
+  assert((!IsStatic || Context == DeclaratorContext::MemberContext) &&
+      "Expecting static specifier for member only");
+
+  // consume kw_using
+  SourceLocation UsingLoc;
+  if (!TryConsumeToken(tok::kw_using, UsingLoc)) {
+    llvm_unreachable("Token was expected to be kw_using");
   }
 
-  if (D.EllipsisLoc.isValid()) {
-    Diag(D.EllipsisLoc, diag::err_alias_declaration_pack_expansion)
-      << FixItHint::CreateRemoval(SourceRange(D.EllipsisLoc));
-  }
+  if (!IsStatic)
+    BeginLoc = UsingLoc;
 
   DeclSpec DS(AttrFactory);
-  Declarator ParametricExpressionDeclarator(
-      DS, DeclaratorContext::ParametricExpressionContext);
+  if (IsStatic) {
+    unsigned DiagID;
+    const char *PrevSpec = nullptr;
+    DS.SetStorageClassSpec(Actions, DeclSpec::SCS_static,
+                           BeginLoc, PrevSpec, DiagID,
+                           Actions.getPrintingPolicy());
+  }
 
-  if (D.Name.getKind() == UnqualifiedIdKind::IK_Identifier) {
-    ParametricExpressionDeclarator.SetIdentifier(D.Name.Identifier,
-                                                 D.Name.getBeginLoc());
-  }
-  else if (D.Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
-    Diag(D.SS.getBeginLoc(), diag::err_parametric_expression_name_invalid)
-      << FixItHint::CreateRemoval(D.SS.getRange());
-    return nullptr;
-#if 0 // TODO reenable operator ids
-    unsigned *RawSymbolLocations = D.Name.OperatorFunctionId.SymbolLocations;
-    SourceLocation SymbolLocations[3] = {
-      SourceLocation::getFromRawEncoding(RawSymbolLocations[0]),
-      SourceLocation::getFromRawEncoding(RawSymbolLocations[1]),
-      SourceLocation::getFromRawEncoding(RawSymbolLocations[2])};
-    ParametricExpressionDeclarator.getName().setOperatorFunctionId(
-                                            D.Name.getBeginLoc(),
-                                            D.Name.OperatorFunctionId.Operator,
-                                            SymbolLocations
-                                          );
-#endif
-  }
-  else {
-    // TODO use a better diagnostic message for an invalid id
-    Diag(D.SS.getBeginLoc(), diag::err_alias_declaration_not_identifier)
-      << FixItHint::CreateRemoval(D.SS.getRange());
-    // No removal fixit: can't recover from this.
+  Declarator D(DS, DeclaratorContext::ParametricExpressionContext);
+
+  // Name
+  //
+  // Either an identifier or an operator function id
+
+  CXXScopeSpec Spec;
+  UnqualifiedId &Name = D.getName();
+  if (ParseUnqualifiedId(
+          Spec,
+          /*EnteringContext=*/false,
+          /*AllowDestructorName=*/false,
+          /*AllowConstructorName=*/false,
+          /*AllowDeductionGuide=*/false,
+          nullptr, nullptr, Name)) {
     return nullptr;
   }
+
+  Scope* S = getCurScope();
+  if (ExpectAndConsume(tok::l_paren)) {
+    return nullptr;
+  }
+
+  if (Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
+    // TODO reenable operator ids
+    Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
+      << FixItHint::CreateRemoval(Name.getSourceRange());
+    return nullptr;
+  }
+  else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
+    Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
+      << FixItHint::CreateRemoval(Name.getSourceRange());
+    return nullptr;
+  }
+
+  // Params
 
   TemplateParameterDepthRAII CurTemplateDepthTracker(TemplateParameterDepth);
   ParseScope PrototypeScope(this,
@@ -903,19 +922,30 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
 
   ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
                                                S, getCurScope(), AS,
-                                               UsingLoc, TemplateParameterDepth,
-                                               ParametricExpressionDeclarator);
+                                               BeginLoc,
+                                               TemplateParameterDepth, D);
   if (!New)
     return nullptr;
 
   Actions.PushDeclContext(Actions.getCurScope(), New);
 
   if (Tok.isNot(tok::r_paren)) {
-    ParseParameterDeclarationClause(ParametricExpressionDeclarator,
-                                    attrs, ParamInfo, EllipsisLoc);
+    ParseParameterDeclarationClause(D, attrs, ParamInfo, EllipsisLoc);
   }
   T.consumeClose();
   PrototypeScope.Exit();
+
+#if 0 // I don't think this is right
+  // C style variadic function syntax is not allowed in parametric expression
+  // parameter list
+  if (D.hasEllipsis()) {
+    Diag(D.getBeginLoc(), diag::err_parametric_expression_vararg)
+      << Name.getName();
+    return nullptr;
+  }
+#endif
+
+  // Body
 
   // At the very least we need an AST node to wrap
   // the expression so we can load `this` in CodeGen.
@@ -940,7 +970,7 @@ Decl *Parser::ParseParametricExpressionDeclarationAfterUsingDeclarator(
   BodyScope.Exit();
   Actions.PopFunctionScopeInfo();
 
-  return TheDecl;
+  return Actions.ConvertDeclToDeclGroup(TheDecl);
 }
 
 /// ParseStaticAssertDeclaration - Parse C++0x or C11 static_assert-declaration.
@@ -2646,8 +2676,17 @@ Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
 
   MaybeParseMicrosoftAttributes(attrs);
 
+  if (Tok.is(tok::kw_static) && NextToken().is(tok::kw_using))
+    return ParseParametricExpressionDeclaration(
+        DeclaratorContext::MemberContext, AS);
+
   if (Tok.is(tok::kw_using)) {
     ProhibitAttributes(attrs);
+
+    if (GetLookAheadToken(1).is(tok::kw_operator) ||
+        GetLookAheadToken(2).is(tok::l_paren))
+      return ParseParametricExpressionDeclaration(
+          DeclaratorContext::MemberContext, AS);
 
     // Eat 'using'.
     SourceLocation UsingLoc = ConsumeToken();

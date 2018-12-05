@@ -10535,10 +10535,9 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 
 ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
                           Scope *S, Scope *BodyScope, AccessSpecifier AS,
-                          SourceLocation UsingLoc, unsigned TemplateDepth,
-                          Declarator &ParametricExpressionDeclarator) {
-  DeclarationNameInfo NameInfo = GetNameForDeclarator(
-      ParametricExpressionDeclarator);
+                          SourceLocation BeginLoc, unsigned TemplateDepth,
+                          Declarator &D) {
+  DeclarationNameInfo NameInfo = GetNameForDeclarator(D);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
                         NotForRedeclaration);
   LookupName(Previous, S);
@@ -10548,31 +10547,26 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
   if (!Previous.empty()) {
     NamedDecl *PreviousDecl = Previous.getRepresentativeDecl();
     if (PreviousDecl->getKind() == Decl::ParametricExpression) {
-      Diag(UsingLoc, diag::err_redefinition_of_parametric_expression)
+      Diag(BeginLoc, diag::err_redefinition_of_parametric_expression)
         << NameInfo.getName();
       notePreviousDefinition(PreviousDecl,
-                             ParametricExpressionDeclarator.getBeginLoc());
+                             D.getBeginLoc());
     } else {
-      Diag(UsingLoc, diag::err_redefinition_different_kind)
+      Diag(BeginLoc, diag::err_redefinition_different_kind)
         << NameInfo.getName();
       notePreviousDefinition(PreviousDecl,
-                             ParametricExpressionDeclarator.getBeginLoc());
+                             D.getBeginLoc());
     }
     return nullptr;
   }
 
-  // C style variadic function syntax is not allowed in parametric expression
-  // parameter list
-  if (ParametricExpressionDeclarator.hasEllipsis()) {
-    Diag(ParametricExpressionDeclarator.getBeginLoc(), diag::err_parametric_expression_vararg)
-      << NameInfo.getName();
-    return nullptr;
-  }
+  bool IsStatic = D.getDeclSpec().getStorageClassSpec() == DeclSpec::SCS_static;
 
   ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
                                                                    NameInfo.getName(),
-                                                                   UsingLoc,
-                                                                   TemplateDepth);
+                                                                   BeginLoc,
+                                                                   TemplateDepth,
+                                                                   IsStatic);
   assert(New && "ParametricExpressionDecl::Create failed??");
   New->setAccess(AS);
   PushOnScopeChains(New, S);
