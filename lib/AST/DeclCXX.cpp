@@ -2934,6 +2934,7 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
                                            Old->getBeginLoc(),
                                            Old->getTemplateDepth(),
                                            Old->isStatic());
+  New->setConstThis(Old->isConstThis());
   New->setAccess(Old->getAccess());
   return New;
 }

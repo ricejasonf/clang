@@ -3953,7 +3953,8 @@ class ParametricExpressionDecl : public NamedDecl,
   ParmVarDecl **ParamInfo = nullptr;
   unsigned NumParams = 0;
   unsigned TemplateDepth;
-  bool IsStatic;
+  bool IsStatic : 1;
+  bool IsConstThis : 1;
 
   ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
                            SourceLocation StartL,
@@ -3984,6 +3985,14 @@ public:
 
   bool isStatic() const {
     return IsStatic;
+  }
+
+  void setConstThis(bool value) {
+    IsConstThis = value;
+  }
+
+  bool isConstThis() const {
+    return IsConstThis;
   }
 
   // Returns parent class decl if this

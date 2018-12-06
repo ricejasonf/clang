@@ -7991,7 +7991,10 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   }
 
   Stmt *Output = D->getBody();
-  assert(Output && "ParametricExpressionDecl Output is nullptr");
+  if (!Output) {
+    // This is an error but just assume that we have an empty body
+    Output = CompoundStmt::CreateEmpty(Context, /*NumStmts=*/0);
+  }
 
   LocalInstantiationScope Scope(*this, /*CombineWithOuterScope=*/true);
   InstantiatingTemplate Inst(*this, LParenLoc, D);
@@ -8026,7 +8029,9 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
                                                                 D, &Innermost);
 
-  Sema::CXXThisScopeRAII ThisScope(*this, D->getThisContext(), 0);
+  unsigned ThisQuals = D->isConstThis() ? DeclSpec::TQ_const :
+                                          DeclSpec::TQ_unspecified;
+  Sema::CXXThisScopeRAII ThisScope(*this, D->getThisContext(), ThisQuals);
 
   if (CompoundStmt::classof(Output)) {
     StmtResult CSResult = SubstStmt(Output, TemplateArgs);

@@ -10618,10 +10618,18 @@ bool Sema::CheckParametricExpressionParams(
 
 Decl *Sema::ActOnFinishParametricExpressionDecl(
                                     ParametricExpressionDecl* New,
+                                    SourceLocation MemberConstLoc,
                                     bool NeedsRAII,
                                     StmtResult CompoundStmtResult) {
   if (!New || CompoundStmtResult.isInvalid())
     return nullptr;
+
+  if (MemberConstLoc.isValid()) {
+    if (!New->getThisContext())
+      Diag(MemberConstLoc,
+           diag::err_parametric_expression_invalid_const_specifier);
+    New->setConstThis(true);
+  }
 
   // Body
 

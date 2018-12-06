@@ -896,11 +896,13 @@ Parser::ParseParametricExpressionDeclaration(
     // TODO reenable operator ids
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(Name.getSourceRange());
+    SkipMalformedDecl();
     return nullptr;
   }
   else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(Name.getSourceRange());
+    SkipMalformedDecl();
     return nullptr;
   }
 
@@ -945,12 +947,6 @@ Parser::ParseParametricExpressionDeclaration(
   }
 #endif
 
-  // Body
-
-  // At the very least we need an AST node to wrap
-  // the expression so we can load `this` in CodeGen.
-  // For now, we assume it requires RAII if it is a
-  // non-static member.
   CXXRecordDecl *ThisContext = New->getThisContext();
   bool NeedsRAII = ThisContext != nullptr;
 
@@ -960,12 +956,36 @@ Parser::ParseParametricExpressionDeclaration(
   if (Actions.CheckParametricExpressionParams(
         getCurScope(), NeedsRAII, New, ParamInfo)) {
     Actions.PopDeclContext(); // DeclContextRAII would be nice
+    SkipMalformedDecl();
     return nullptr;
   }
 
-  Sema::CXXThisScopeRAII ThisScope(Actions, ThisContext, 0);
+  // Parse the optional const specifier for members
+  // Consider using ParseDeclarationSpecifiers
+  bool IsConstThis = false;
+  SourceLocation MConstLoc;
+  IsConstThis = TryConsumeToken(tok::kw_const, MConstLoc);
+
+  if (Tok.isNot(tok::l_brace)) {
+    Diag(Tok, diag::err_expected) << tok::l_brace;
+    SkipMalformedDecl();
+    return nullptr;
+  }
+
+  // Body
+
+  // At the very least we need an AST node to wrap
+  // the expression so we can load `this` in CodeGen.
+  // For now, we assume it requires RAII if it is a
+  // non-static member.
+  unsigned ThisQuals = IsConstThis ? DeclSpec::TQ_const :
+                                     DeclSpec::TQ_unspecified;
+  Sema::CXXThisScopeRAII ThisScope(Actions, ThisContext, ThisQuals);
   StmtResult CSResult = ParseCompoundStatement();
-  Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New, NeedsRAII, CSResult);
+  Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New,
+                                                              MConstLoc,
+                                                              NeedsRAII,
+                                                              CSResult);
   Actions.PopDeclContext();
   BodyScope.Exit();
   Actions.PopFunctionScopeInfo();
