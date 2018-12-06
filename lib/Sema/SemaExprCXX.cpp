@@ -7968,6 +7968,10 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
   Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Fn)->getBaseExpr();
 
+  if (!BaseExpr && D->isCXXInstanceMember())
+    return ExprError(Diag(LParenLoc, diag::err_member_call_without_object)
+      << Fn->getSourceRange());
+
   // We already know there is at most one param pack
   int PackSize = ArgExprs.size() - D->getNumParams() + 1;
   int PackCount = (std::find_if(D->parameters().begin(),
