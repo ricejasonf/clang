@@ -2277,14 +2277,7 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
 
   QualType RetTy = E->getType();
   CompoundStmt *Body = E->getBody();
-  Expr *BaseExpr = E->getBaseExpr();
 
-  if (BaseExpr) {
-    RValue BaseExprResult = EmitAnyExprToTemp(BaseExpr);
-    CXXThisValue = BaseExprResult.isScalar()
-                            ? BaseExprResult.getScalarVal()
-                            : BaseExprResult.getAggregatePointer();
-  }
   /*
   PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body->getBeginLoc(),
                              "LLVM IR generation of parametric expression call ('{}')");

@@ -960,12 +960,6 @@ Parser::ParseParametricExpressionDeclaration(
     return nullptr;
   }
 
-  // Parse the optional const specifier for members
-  // Consider using ParseDeclarationSpecifiers
-  bool IsConstThis = false;
-  SourceLocation MConstLoc;
-  IsConstThis = TryConsumeToken(tok::kw_const, MConstLoc);
-
   if (Tok.isNot(tok::l_brace)) {
     Diag(Tok, diag::err_expected) << tok::l_brace;
     SkipMalformedDecl();
@@ -974,16 +968,8 @@ Parser::ParseParametricExpressionDeclaration(
 
   // Body
 
-  // At the very least we need an AST node to wrap
-  // the expression so we can load `this` in CodeGen.
-  // For now, we assume it requires RAII if it is a
-  // non-static member.
-  unsigned ThisQuals = IsConstThis ? DeclSpec::TQ_const :
-                                     DeclSpec::TQ_unspecified;
-  Sema::CXXThisScopeRAII ThisScope(Actions, ThisContext, ThisQuals);
   StmtResult CSResult = ParseCompoundStatement();
   Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New,
-                                                              MConstLoc,
                                                               NeedsRAII,
                                                               CSResult);
   Actions.PopDeclContext();

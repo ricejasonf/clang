@@ -10560,13 +10560,15 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
     return nullptr;
   }
 
-  bool IsStatic = D.getDeclSpec().getStorageClassSpec() == DeclSpec::SCS_static;
+  bool IsStatic = D.getDeclSpec().getStorageClassSpec() ==
+    DeclSpec::SCS_static;
 
-  ParametricExpressionDecl *New = ParametricExpressionDecl::Create(Context, CurContext,
-                                                                   NameInfo.getName(),
-                                                                   BeginLoc,
-                                                                   TemplateDepth,
-                                                                   IsStatic);
+  ParametricExpressionDecl *
+  New = ParametricExpressionDecl::Create(Context, CurContext,
+                                         NameInfo.getName(),
+                                         BeginLoc,
+                                         TemplateDepth,
+                                         IsStatic);
   assert(New && "ParametricExpressionDecl::Create failed??");
   New->setAccess(AS);
   PushOnScopeChains(New, S);
@@ -10575,11 +10577,17 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
 }
 
 bool Sema::CheckParametricExpressionParams(
-                        Scope *BodyScope, bool &NeedsRAII,
-                        ParametricExpressionDecl* New,
-                        MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo) {
+                      Scope *BodyScope, bool &NeedsRAII,
+                      ParametricExpressionDecl* New,
+                      MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo) {
   SourceLocation PackLocation{};
   SmallVector<ParmVarDecl*, 16> Params;
+
+  if (New->getThisContext() && ParamInfo.size() == 0) {
+    Diag(New->getBeginLoc(),
+         diag::err_member_parametric_expression_must_have_self_param);
+  }
+
   for (auto& P : ParamInfo) {
     assert(P.Param && "ParamInfo param decl must not be null");
 
@@ -10592,7 +10600,8 @@ bool Sema::CheckParametricExpressionParams(
 
     if (PD->isParameterPack()) {
       if (PackLocation.isValid()) {
-        Diag(PD->getBeginLoc(), diag::err_parametric_expression_multiple_parameter_packs);
+        Diag(PD->getBeginLoc(),
+             diag::err_parametric_expression_multiple_parameter_packs);
         Diag(PackLocation, diag::note_entity_declared_at)
           << "Previous parameter pack";
         return true;
@@ -10618,18 +10627,10 @@ bool Sema::CheckParametricExpressionParams(
 
 Decl *Sema::ActOnFinishParametricExpressionDecl(
                                     ParametricExpressionDecl* New,
-                                    SourceLocation MemberConstLoc,
                                     bool NeedsRAII,
                                     StmtResult CompoundStmtResult) {
   if (!New || CompoundStmtResult.isInvalid())
     return nullptr;
-
-  if (MemberConstLoc.isValid()) {
-    if (!New->getThisContext())
-      Diag(MemberConstLoc,
-           diag::err_parametric_expression_invalid_const_specifier);
-    New->setConstThis(true);
-  }
 
   // Body
 

@@ -7960,35 +7960,14 @@ public:
 } // end anon namespace
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
-                                                   MultiExprArg ArgExprs,
+                                                   MultiExprArg CallArgExprs,
                                                    SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Fn) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D =
     static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
   Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Fn)->getBaseExpr();
-
-  if (!BaseExpr && D->isCXXInstanceMember())
-    return ExprError(Diag(LParenLoc, diag::err_member_call_without_object)
-      << Fn->getSourceRange());
-
-  // We already know there is at most one param pack
-  int PackSize = ArgExprs.size() - D->getNumParams() + 1;
-  int PackCount = (std::find_if(D->parameters().begin(),
-                                D->parameters().end(),
-                                [](ParmVarDecl* PD) {
-                                  return PD->isParameterPack(); })
-                  != D->parameters().end()) ? 1 : 0;
-
-  // If PackSize is negative then there must not be a param pack
-  // Or the user gave us an invalid arity
-  if ((PackCount == 1 && PackSize < 0) ||
-      (PackCount == 0 && ArgExprs.size() != D->getNumParams())) {
-    Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
-      << (((PackCount == 1) || ArgExprs.size() > D->getNumParams()) ? 1 : 0);
-    // TODO note the declaration
-    return ExprError();
-  }
+  ArrayRef<ParmVarDecl *> OldParams = D->parameters();
 
   Stmt *Output = D->getBody();
   if (!Output) {
@@ -7996,42 +7975,76 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     Output = CompoundStmt::CreateEmpty(Context, /*NumStmts=*/0);
   }
 
+  if (!BaseExpr && D->isCXXInstanceMember()) {
+    Diag(LParenLoc, diag::err_member_call_without_object)
+      << Fn->getSourceRange();
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+    return ExprError();
+  }
+
   LocalInstantiationScope Scope(*this, /*CombineWithOuterScope=*/true);
   InstantiatingTemplate Inst(*this, LParenLoc, D);
-  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls(ArgExprs.size());
 
-  unsigned I = 0;
-  for (ParmVarDecl *P : D->parameters()) {
+  llvm::SmallVector<Expr*, 16> ArgExprs;
+  // reserve enough for possible BaseExpr
+  ArgExprs.reserve(CallArgExprs.size() + 1);
+  if (BaseExpr)
+    ArgExprs.push_back(BaseExpr);
+  for (Expr *E : CallArgExprs)
+    ArgExprs.push_back(E);
+
+
+  llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls;
+  NewParmVarDecls.reserve(ArgExprs.size() + 1);
+
+  // We already know there is at most one param pack
+  int PackSize = ArgExprs.size() - OldParams.size() + 1;
+  int PackCount = (std::find_if(OldParams.begin(),
+                                OldParams.end(),
+                                [](ParmVarDecl* PD) {
+                                  return PD->isParameterPack(); })
+                  != OldParams.end()) ? 1 : 0;
+
+  // If PackSize is negative then there must not be a param pack
+  // Or the user gave us an invalid arity
+  if ((PackCount == 1 && PackSize < 0) ||
+      (PackCount == 0 && ArgExprs.size() != OldParams.size())) {
+    Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
+      << (((PackCount == 1) || ArgExprs.size() > OldParams.size()) ? 1 : 0);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+    return ExprError();
+  }
+
+  auto ArgExprsItr = ArgExprs.begin();
+
+  for (ParmVarDecl *P : OldParams) {
     if (P->isParameterPack()) {
-      int PackSize = ArgExprs.size() - D->parameters().size() + 1;
       assert(PackSize >= 0 && "Pack size is negative!");
 
       Scope.MakeInstantiatedLocalArgPack(P);
-      for (int J = 0; J < PackSize; J++) {
-        assert(I < ArgExprs.size() && "ArgExprs index out of range");
-        ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+      for (int J = 0; J < PackSize; ++J) {
+        assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
+        ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
         if (!New) return ExprError();
-        NewParmVarDecls[I] = New;
         Scope.InstantiatedLocalPackArg(P, New);
-        ++I;
+        NewParmVarDecls.push_back(New);
+        ++ArgExprsItr;
       }
     } else {
-      assert(I < ArgExprs.size() && "ArgExprs index out of range");
-      ParmVarDecl *New = BuildParametricExpressionParam(P, ArgExprs[I]);
+      assert(ArgExprsItr < ArgExprs.end() && "ArgExprsItr out of range");
+      ParmVarDecl *New = BuildParametricExpressionParam(P, *ArgExprsItr);
       if (!New) return ExprError();
-      NewParmVarDecls[I] = New;
       Scope.InstantiatedLocal(P, New);
-      ++I;
+      NewParmVarDecls.push_back(New);
+      ++ArgExprsItr;
     }
   }
 
   TemplateArgumentList Innermost(TemplateArgumentList::OnStack, {});
   MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
                                                                 D, &Innermost);
-
-  unsigned ThisQuals = D->isConstThis() ? DeclSpec::TQ_const :
-                                          DeclSpec::TQ_unspecified;
-  Sema::CXXThisScopeRAII ThisScope(*this, D->getThisContext(), ThisQuals);
 
   if (CompoundStmt::classof(Output)) {
     StmtResult CSResult = SubstStmt(Output, TemplateArgs);
@@ -8069,7 +8082,8 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
 
 // used in ActOnParametricExpression and
 // TreeTransform<Derived>::TransformParametricExpressionCallExpr
-ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExpr) {
+ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
+                                                  Expr *ArgExpr) {
   QualType ArgTy;
   if (!ArgExpr) {
     ArgTy = Old->getType();
@@ -8079,10 +8093,10 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old, Expr *ArgExp
   } else if (ArgExpr->getType()->isPlaceholderType()) {
     CheckPlaceholderExpr(ArgExpr);
     return nullptr;
-  } else if (ArgExpr->isRValue()) {
-    ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
-  } else {
+  } else if (ArgExpr->isLValue()) {
     ArgTy = Context.getLValueReferenceType(ArgExpr->getType());
+  } else {
+    ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
   }
 
   TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(ArgTy);

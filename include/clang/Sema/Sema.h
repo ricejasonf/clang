@@ -4686,7 +4686,7 @@ public:
                         MutableArrayRef<DeclaratorChunk::ParamInfo> ParamInfo);
   Decl *ActOnFinishParametricExpressionDecl(
                         ParametricExpressionDecl* D,
-                        SourceLocation MemberConstLoc, bool NeedsRAII,
+                        bool NeedsRAII,
                         StmtResult CompoundStmtResult);
 
   ExprResult ActOnParametricExpressionCallExpr(

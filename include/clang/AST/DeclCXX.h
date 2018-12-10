@@ -3954,7 +3954,6 @@ class ParametricExpressionDecl : public NamedDecl,
   unsigned NumParams = 0;
   unsigned TemplateDepth;
   bool IsStatic : 1;
-  bool IsConstThis : 1;
 
   ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
                            SourceLocation StartL,
@@ -3983,16 +3982,14 @@ public:
     return Body;
   }
 
+  ParmVarDecl *getSelfParam() {
+    // Forward support for an explicitly declared
+    // `this` annotated parameter.
+    return nullptr;
+  }
+
   bool isStatic() const {
     return IsStatic;
-  }
-
-  void setConstThis(bool value) {
-    IsConstThis = value;
-  }
-
-  bool isConstThis() const {
-    return IsConstThis;
   }
 
   // Returns parent class decl if this

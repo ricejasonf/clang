@@ -1510,11 +1510,6 @@ public:
     unsigned OldNumReturnExprs;
     unsigned OldNumSimpleReturnExprs;
     JumpDest OldReturnBlock;
-    ImplicitParamDecl *OldCXXABIThisDecl;
-    llvm::Value *OldCXXABIThisValue;
-    llvm::Value *OldCXXThisValue;
-    CharUnits OldCXXABIThisAlignment;
-    CharUnits OldCXXThisAlignment;
 
   public:
     ParametricExpressionCallExprScope(CodeGenFunction &CGF)
@@ -1523,19 +1518,9 @@ public:
       , OldReturnValue(CGF.ReturnValue)
       , OldNumReturnExprs(CGF.NumReturnExprs)
       , OldNumSimpleReturnExprs(CGF.NumSimpleReturnExprs)
-      , OldReturnBlock(CGF.ReturnBlock)
-      , OldCXXABIThisDecl(CGF.CXXABIThisDecl)
-      , OldCXXABIThisValue(CGF.CXXABIThisValue)
-      , OldCXXThisValue(CGF.CXXThisValue)
-      , OldCXXABIThisAlignment(CGF.CXXABIThisAlignment)
-      , OldCXXThisAlignment(CGF.CXXThisAlignment) {
+      , OldReturnBlock(CGF.ReturnBlock) {
       CGF.NumReturnExprs = 0;
       CGF.NumSimpleReturnExprs = 0;
-      CGF.CXXABIThisDecl = nullptr;
-      CGF.CXXABIThisValue = nullptr;
-      CGF.CXXThisValue = nullptr;
-      CGF.CXXABIThisAlignment = CharUnits();
-      CGF.CXXThisAlignment = CharUnits();
     }
 
     ~ParametricExpressionCallExprScope() {
@@ -1544,11 +1529,6 @@ public:
       CGF.NumReturnExprs = OldNumReturnExprs;
       CGF.NumSimpleReturnExprs = OldNumSimpleReturnExprs;
       CGF.ReturnBlock = OldReturnBlock;
-      CGF.CXXABIThisDecl = OldCXXABIThisDecl;
-      CGF.CXXABIThisValue = OldCXXABIThisValue;
-      CGF.CXXThisValue = OldCXXThisValue;
-      CGF.CXXABIThisAlignment = OldCXXABIThisAlignment;
-      CGF.CXXThisAlignment = OldCXXThisAlignment;
     }
   };
 

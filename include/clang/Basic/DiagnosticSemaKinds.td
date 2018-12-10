@@ -4689,9 +4689,8 @@ def err_parametric_expression_constraint_has_qualifiers : Error<
   "Parametric expression parameter constraint must not have qualifiers">;
 def err_parametric_expression_arg_list_different_arity : Error<
   "%select{too few|too many}0 arguments for parametric expression">;
-def err_parametric_expression_invalid_const_specifier : Error<
-  "non-member or static-member parametric expression "
-  "cannot have 'const' qualifier">;
+def err_member_parametric_expression_must_have_self_param : Error<
+  "Non-static member parametric expression must have parameter for object instance">;
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;
