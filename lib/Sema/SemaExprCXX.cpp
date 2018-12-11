@@ -7989,7 +7989,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   llvm::SmallVector<Expr*, 16> ArgExprs;
   // reserve enough for possible BaseExpr
   ArgExprs.reserve(CallArgExprs.size() + 1);
-  if (BaseExpr)
+  if (BaseExpr && !D->isStatic())
     ArgExprs.push_back(BaseExpr);
   for (Expr *E : CallArgExprs)
     ArgExprs.push_back(E);
