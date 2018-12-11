@@ -2765,6 +2765,9 @@ public:
                                     OverloadCandidateSet& CandidateSet,
                                     bool SuppressUserConversions = false,
                                     bool PartialOverloading = false);
+  void AddParametricExpressionCandidate(ParametricExpressionDecl *PD,
+                                        DeclAccessPair FoundDecl,
+                                        OverloadCandidateSet& CandidateSet);
   bool CheckNonDependentConversions(FunctionTemplateDecl *FunctionTemplate,
                                     ArrayRef<QualType> ParamTypes,
                                     ArrayRef<Expr *> Args,
@@ -4690,8 +4693,12 @@ public:
                         StmtResult CompoundStmtResult);
 
   ExprResult ActOnParametricExpressionCallExpr(
-                        Scope *S, Expr *Fn, MultiExprArg ArgExprs,
-                        SourceLocation LParenLoc);
+                        ParametricExpressionIdExpr *Fn,
+                        MultiExprArg ArgExprs, SourceLocation LParenLoc);
+  ExprResult ActOnParametricExpressionCallExpr(
+                        ParametricExpressionDecl *D,
+                        Expr *BaseExpr, MultiExprArg ArgExprs,
+                        SourceLocation Loc);
   ExprResult BuildParametricExpressionCallExpr(
                         SourceLocation BeginLoc, CompoundStmt *Body,
                         Expr *BaseExpr,

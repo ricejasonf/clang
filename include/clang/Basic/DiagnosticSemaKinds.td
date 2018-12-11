@@ -4691,6 +4691,8 @@ def err_parametric_expression_arg_list_different_arity : Error<
   "%select{too few|too many}0 arguments for parametric expression">;
 def err_member_parametric_expression_must_have_self_param : Error<
   "Non-static member parametric expression must have parameter for object instance">;
+def note_ovl_parametric_expression_candidate : Note<
+    "parametric expression candidate">;
 
 def err_inline_decl_follows_def : Error<
   "inline declaration of %0 follows non-inline definition">;

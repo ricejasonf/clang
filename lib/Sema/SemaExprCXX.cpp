@@ -7959,14 +7959,32 @@ public:
 };
 } // end anon namespace
 
-ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
+ExprResult Sema::ActOnParametricExpressionCallExpr(
+                                              ParametricExpressionIdExpr *Id,
                                                    MultiExprArg CallArgExprs,
                                                    SourceLocation LParenLoc) {
-  assert(isa<ParametricExpressionIdExpr>(Fn) &&
+  assert(isa<ParametricExpressionIdExpr>(Id) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D =
-    static_cast<ParametricExpressionIdExpr*>(Fn)->getDefinitionDecl();
-  Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Fn)->getBaseExpr();
+    static_cast<ParametricExpressionIdExpr*>(Id)->getDefinitionDecl();
+  Expr *BaseExpr = static_cast<ParametricExpressionIdExpr*>(Id)->getBaseExpr();
+
+  if (!BaseExpr && D->isCXXInstanceMember()) {
+    Diag(LParenLoc, diag::err_member_call_without_object)
+      << Id->getSourceRange();
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+    return ExprError();
+  }
+
+  return ActOnParametricExpressionCallExpr(D, BaseExpr, CallArgExprs,
+                                           LParenLoc);
+}
+
+ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
+                                                   Expr *BaseExpr,
+                                                   MultiExprArg CallArgExprs,
+                                                   SourceLocation Loc) {
   ArrayRef<ParmVarDecl *> OldParams = D->parameters();
 
   Stmt *Output = D->getBody();
@@ -7975,16 +7993,8 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     Output = CompoundStmt::CreateEmpty(Context, /*NumStmts=*/0);
   }
 
-  if (!BaseExpr && D->isCXXInstanceMember()) {
-    Diag(LParenLoc, diag::err_member_call_without_object)
-      << Fn->getSourceRange();
-    Diag(D->getLocation(), diag::note_previous_decl)
-      << D->getDeclName();
-    return ExprError();
-  }
-
   LocalInstantiationScope Scope(*this, /*CombineWithOuterScope=*/true);
-  InstantiatingTemplate Inst(*this, LParenLoc, D);
+  InstantiatingTemplate Inst(*this, Loc, D);
 
   llvm::SmallVector<Expr*, 16> ArgExprs;
   // reserve enough for possible BaseExpr
@@ -8010,7 +8020,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
   // Or the user gave us an invalid arity
   if ((PackCount == 1 && PackSize < 0) ||
       (PackCount == 0 && ArgExprs.size() != OldParams.size())) {
-    Diag(LParenLoc, diag::err_parametric_expression_arg_list_different_arity)
+    Diag(Loc, diag::err_parametric_expression_arg_list_different_arity)
       << (((PackCount == 1) || ArgExprs.size() > OldParams.size()) ? 1 : 0);
     Diag(D->getLocation(), diag::note_previous_decl)
       << D->getDeclName();
@@ -8051,7 +8061,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(Scope *S, Expr *Fn,
     if (CSResult.isInvalid())
       return ExprError();
 
-    return BuildParametricExpressionCallExpr(LParenLoc,
+    return BuildParametricExpressionCallExpr(Loc,
                                              CSResult.getAs<CompoundStmt>(),
                                              BaseExpr,
                                              NewParmVarDecls);

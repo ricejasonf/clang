@@ -5368,9 +5368,9 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
       }
     }
 
-    if (isa<ParametricExpressionIdExpr>(Fn)) {
-      return ActOnParametricExpressionCallExpr(Scope, Fn, ArgExprs, LParenLoc);
-    }
+    if (ParametricExpressionIdExpr *PE =
+        dyn_cast<ParametricExpressionIdExpr>(Fn))
+      return ActOnParametricExpressionCallExpr(PE, ArgExprs, LParenLoc);
 
     // Determine whether this is a call to an object (C++ [over.call.object]).
     if (Fn->getType()->isRecordType())

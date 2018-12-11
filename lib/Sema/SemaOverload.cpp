@@ -6464,6 +6464,10 @@ void Sema::AddMethodCandidate(DeclAccessPair FoundDecl,
                                /*ExplicitArgs*/ nullptr, ObjectType,
                                ObjectClassification, Args, CandidateSet,
                                SuppressUserConversions);
+  } else if (ParametricExpressionDecl *PD =
+      dyn_cast<ParametricExpressionDecl>(Decl)) {
+    AddParametricExpressionCandidate(PD, FoundDecl, CandidateSet);
+
   } else {
     AddMethodCandidate(cast<CXXMethodDecl>(Decl), FoundDecl, ActingContext,
                        ObjectType, ObjectClassification, Args, CandidateSet,
@@ -6742,6 +6746,22 @@ Sema::AddTemplateOverloadCandidate(FunctionTemplateDecl *FunctionTemplate,
   AddOverloadCandidate(Specialization, FoundDecl, Args, CandidateSet,
                        SuppressUserConversions, PartialOverloading,
                        /*AllowExplicit*/false, Conversions);
+}
+
+/// Parametric Expression candidates are always operators
+/// and are always considered viable.
+void
+Sema::AddParametricExpressionCandidate(ParametricExpressionDecl *PD,
+                                       DeclAccessPair FoundDecl,
+                                       OverloadCandidateSet& CandidateSet) {
+  OverloadCandidate &Candidate = CandidateSet.addCandidate();
+  Candidate.FoundDecl = FoundDecl;
+  Candidate.Function = nullptr;
+  Candidate.Viable = true;
+  // We don't care about conversions here
+  Candidate.IsSurrogate = false;
+  Candidate.IgnoreObjectArgument = true;
+  Candidate.ExplicitCallArguments = 0;
 }
 
 /// Check that implicit conversion sequences can be formed for each argument
@@ -9020,6 +9040,11 @@ bool clang::isBetterOverloadCandidate(
   else if (!Cand1.Viable)
     return false;
 
+  // parametric expressions are ambiguous with other viable candidates
+  if (isa<ParametricExpressionDecl>(Cand1.FoundDecl.getDecl()) ||
+      isa<ParametricExpressionDecl>(Cand2.FoundDecl.getDecl()))
+     return false;
+
   // C++ [over.match.best]p1:
   //
   //   -- if F is a static member function, ICS1(F) is defined such
@@ -10709,6 +10734,10 @@ void OverloadCandidateSet::NoteCandidates(
                             /*TakingCandidateAddress=*/false);
     else if (Cand->IsSurrogate)
       NoteSurrogateCandidate(S, Cand);
+    else if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(Cand->FoundDecl.getDecl()))
+      S.Diag(PD->getBeginLoc(),
+             diag::note_ovl_parametric_expression_candidate);
     else {
       assert(Cand->Viable &&
              "Non-viable built-in candidates are not added to Cands.");
@@ -12486,6 +12515,9 @@ Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
                   VariadicDoesNotApply);
 
         return MaybeBindToTemporary(TheCall);
+      } else if (ParametricExpressionDecl *PD =
+          dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+        return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
       } else {
         // We matched a built-in operator. Convert the arguments, then
         // break out so that we will build the appropriate built-in

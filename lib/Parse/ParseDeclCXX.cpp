@@ -893,11 +893,13 @@ Parser::ParseParametricExpressionDeclaration(
   }
 
   if (Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
+#if 0
     // TODO reenable operator ids
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(Name.getSourceRange());
     SkipMalformedDecl();
     return nullptr;
+#endif
   }
   else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
