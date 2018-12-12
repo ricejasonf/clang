@@ -6392,6 +6392,12 @@ void Sema::AddFunctionCandidates(const UnresolvedSetImpl &Fns,
     NamedDecl *D = F.getDecl()->getUnderlyingDecl();
     ArrayRef<Expr *> FunctionArgs = Args;
 
+    if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(F.getDecl())) {
+      AddParametricExpressionCandidate(PD, F.getPair(), CandidateSet);
+      return;
+    }
+
     FunctionTemplateDecl *FunTmpl = dyn_cast<FunctionTemplateDecl>(D);
     FunctionDecl *FD =
         FunTmpl ? FunTmpl->getTemplatedDecl() : cast<FunctionDecl>(D);
@@ -6754,6 +6760,8 @@ void
 Sema::AddParametricExpressionCandidate(ParametricExpressionDecl *PD,
                                        DeclAccessPair FoundDecl,
                                        OverloadCandidateSet& CandidateSet) {
+  if (PD->getDeclName().getNameKind() != DeclarationName::CXXOperatorName)
+    return;
   OverloadCandidate &Candidate = CandidateSet.addCandidate();
   Candidate.FoundDecl = FoundDecl;
   Candidate.Function = nullptr;
@@ -8918,13 +8926,20 @@ Sema::AddArgumentDependentLookupCandidates(DeclarationName Name,
       Fns.erase(Cand->Function);
       if (FunctionTemplateDecl *FunTmpl = Cand->Function->getPrimaryTemplate())
         Fns.erase(FunTmpl);
+    } else if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(Cand->FoundDecl.getDecl())) {
+      Fns.erase(PD);
     }
 
   // For each of the ADL candidates we found, add it to the overload
   // set.
   for (ADLResult::iterator I = Fns.begin(), E = Fns.end(); I != E; ++I) {
     DeclAccessPair FoundDecl = DeclAccessPair::make(*I, AS_none);
-    if (FunctionDecl *FD = dyn_cast<FunctionDecl>(*I)) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(*I)) {
+      AddParametricExpressionCandidate(PD, FoundDecl, CandidateSet);
+    }
+    else if (FunctionDecl *FD = dyn_cast<FunctionDecl>(*I)) {
       if (ExplicitTemplateArgs)
         continue;
 
@@ -12269,6 +12284,9 @@ Sema::CreateOverloadedUnaryOp(SourceLocation OpLoc, UnaryOperatorKind Opc,
         return ExprError();
 
       return MaybeBindToTemporary(TheCall);
+    } else if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+      return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
     } else {
       // We matched a built-in operator. Convert the arguments, then
       // break out so that we will build the appropriate built-in
@@ -13207,6 +13225,10 @@ Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
   UnbridgedCasts.restore();
 
   if (Best->Function == nullptr) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl()))
+      return ActOnParametricExpressionCallExpr(PD, Obj, Args, LParenLoc);
+
     // Since there is no function declaration, this is one of the
     // surrogate candidates. Dig out the conversion function.
     CXXConversionDecl *Conv

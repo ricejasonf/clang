@@ -3343,7 +3343,8 @@ void Sema::ArgumentDependentLookup(DeclarationName Name, SourceLocation Loc,
         Underlying = USD->getTargetDecl();
 
       if (!isa<FunctionDecl>(Underlying) &&
-          !isa<FunctionTemplateDecl>(Underlying))
+          !isa<FunctionTemplateDecl>(Underlying) &&
+          !isa<ParametricExpressionDecl>(Underlying))
         continue;
 
       if (!isVisible(D)) {

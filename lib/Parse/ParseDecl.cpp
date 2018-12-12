@@ -1681,7 +1681,8 @@ Parser::DeclGroupPtrTy Parser::ParseDeclaration(DeclaratorContext Context,
     ProhibitAttributes(attrs);
     return ParseNamespace(Context, DeclEnd);
   case tok::kw_using:
-    if (GetLookAheadToken(2).is(tok::l_paren))
+    if (GetLookAheadToken(1).is(tok::kw_operator) ||
+        GetLookAheadToken(2).is(tok::l_paren))
       return ParseParametricExpressionDeclaration(Context);
     return ParseUsingDirectiveOrDeclaration(Context, ParsedTemplateInfo(),
                                             DeclEnd, attrs);

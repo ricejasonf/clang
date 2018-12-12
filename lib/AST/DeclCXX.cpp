@@ -2922,6 +2922,9 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth,
                                            IsStatic);
+  if (DN.getNameKind() == DeclarationName::CXXOperatorName &&
+        !DC->isRecord())
+    New->setNonMemberOperator();
   return New;
 }
 
@@ -2935,6 +2938,9 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
                                            Old->getTemplateDepth(),
                                            Old->isStatic());
   New->setAccess(Old->getAccess());
+  if (Old->getDeclName().getNameKind() == DeclarationName::CXXOperatorName &&
+        !DC->isRecord())
+    New->setNonMemberOperator();
   return New;
 }
 
