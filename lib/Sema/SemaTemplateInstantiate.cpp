@@ -1364,10 +1364,13 @@ TemplateInstantiator::TransformFunctionParmPackRefExpr(DeclRefExpr *E,
   typedef LocalInstantiationScope::DeclArgumentPack DeclArgumentPack;
   llvm::PointerUnion<Decl *, DeclArgumentPack *> *Found
     = getSema().CurrentInstantiationScope->findInstantiationOf(PD);
-  assert(Found && "no instantiation for parameter pack");
+  assert((Found || SemaRef.ExpandingExprAlias) &&
+      "no instantiation for parameter pack");
 
   Decl *TransformedDecl;
-  if (DeclArgumentPack *Pack = Found->dyn_cast<DeclArgumentPack *>()) {
+  if (!Found)
+    TransformedDecl = PD;
+  else if (DeclArgumentPack *Pack = Found->dyn_cast<DeclArgumentPack *>()) {
     // If this is a reference to a function parameter pack which we can
     // substitute but can't yet expand, build a FunctionParmPackExpr for it.
     if (getSema().ArgumentPackSubstitutionIndex == -1) {

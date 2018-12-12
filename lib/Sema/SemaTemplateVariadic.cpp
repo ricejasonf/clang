@@ -668,7 +668,7 @@ bool Sema::CheckParameterPacksForExpansion(
       llvm::PointerUnion<Decl *, DeclArgumentPack *> *Instantiation
         = CurrentInstantiationScope->findInstantiationOf(
                                         i->first.get<NamedDecl *>());
-      if (Instantiation->is<DeclArgumentPack *>()) {
+      if (Instantiation && Instantiation->is<DeclArgumentPack *>()) {
         // We could expand this function parameter pack.
         NewPackSize = Instantiation->get<DeclArgumentPack *>()->size();
       } else {
