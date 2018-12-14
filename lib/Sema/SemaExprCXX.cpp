@@ -7985,6 +7985,12 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                                    Expr *BaseExpr,
                                                    MultiExprArg CallArgExprs,
                                                    SourceLocation Loc) {
+  // Defer instantiation if the args are value-dependent
+  if (ParametricExpressionCallExpr::hasDependentArgs(CallArgExprs)) {
+    return ParametricExpressionCallExpr::CreateDependent(Loc, D, BaseExpr,
+                                                         CallArgExprs);
+  }
+
   ArrayRef<ParmVarDecl *> OldParams = D->parameters();
 
   Stmt *Output = D->getBody();
@@ -8056,38 +8062,48 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
   MultiLevelTemplateArgumentList TemplateArgs = getTemplateInstantiationArgs(
                                                                 D, &Innermost);
 
+  // Instantiate the body
   if (CompoundStmt::classof(Output)) {
     StmtResult CSResult = SubstStmt(Output, TemplateArgs);
     if (CSResult.isInvalid())
       return ExprError();
 
-    return BuildParametricExpressionCallExpr(Loc,
+    return BuildParametricExpressionCallExpr(Loc, D
                                              CSResult.getAs<CompoundStmt>(),
-                                             BaseExpr,
                                              NewParmVarDecls);
   } else {
-    return SubstExpr(static_cast<Expr*>(Output), TemplateArgs);
+    // Raw transformation with no AST wrapper
+    return SubstExpr(cast<Expr>(Output), TemplateArgs);
   }
 }
 
 ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
-                                             CompoundStmt *Body, Expr *BaseExpr,
+                                             ParametricExpressionDecl *D,
+                                             CompoundStmt *InstantiatedBody,
                                              ArrayRef<ParmVarDecl *> Params) {
-  ParametricExpressionReturnStmtVisitor R(*this);
-  R.TraverseStmt(Body);
-  ExprValueKind VK = R.getResultType()->isReferenceType() ? VK_LValue :
-                                                            VK_RValue;
-  QualType T = R.getResultType().getNonReferenceType();
+  // Assume type dependence if there is value dependent arguments
+  ExprValueKind VK;
+  QualType T;
 
-  // If the visitor found no return statements
-  // then it will still be DependentTy so we
-  // can assume an impicit return of void.
-  if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr()) {
-    T = Context.VoidTy;
+  // The Body is not instantiated until all args are non-dependent
+  // (ie value-dependent)
+  if (InstantiatedBody) {
+    ParametricExpressionReturnStmtVisitor R(*this);
+    R.TraverseStmt(InstantiatedBody);
+    VK = R.getResultType()->isReferenceType() ? VK_LValue : VK_RValue;
+    T = R.getResultType().getNonReferenceType();
+    // Default to returning `void`
+    // TODO consider QualType() as the placeholder for default
+    if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr())
+      T = Context.VoidTy;
+  } else {
+    VK = VK_RValue;
+    T = Context.DependentTy;
   }
 
-  return ParametricExpressionCallExpr::Create(Context, BeginLoc, Body,
-                                              BaseExpr, T, VK, Params);
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc, D,
+                                              InstantiatedBody,
+                                              T, VK, Params);
 }
 
 // used in ActOnParametricExpression and

@@ -3257,6 +3257,17 @@ public:
                                             RParenLoc);
   }
 
+  // Build a new dependent call to a parametric expression
+  //
+  // By default this attempts to create a resolved call
+  ExprResult RebuildDependentParametricExpressionCallExpr(
+                                               ParametricExpressionDecl *D,
+                                               Expr *BaseExpr,
+                                               ArrayRef<Expr *> CallArgs,
+                                               SourceLocation Loc) {
+    return SemaRef.ActOnParametricExpressionCallExpr(D, BaseExpr, CallArgs, Loc);
+  }
+
   // Build a new call to a parametric expression
   //
   // By default, just creates a new one with the given inputs
@@ -8942,8 +8953,8 @@ TreeTransform<Derived>::TransformDeclRefExpr(DeclRefExpr *E) {
 
   if (ParmVarDecl* PD = dyn_cast<ParmVarDecl>(ND)) {
     if (PD->isUsingSpecified() && PD->hasInit()) {
-      Sema::ExpandingExprAliasRAII ExpandingExprAlias(SemaRef);
-      return SemaRef.SubstExpr(PD->getInit(), {});
+        Sema::ExpandingExprAliasRAII ExpandingExprAlias(SemaRef);
+        return SemaRef.SubstExpr(PD->getInit(), {});
     }
   }
 
@@ -12851,6 +12862,42 @@ TreeTransform<Derived>::TransformParametricExpressionIdExpr(
 
 template<typename Derived>
 ExprResult
+TreeTransform<Derived>::TransformDependentParametricExpressionCallExpr(
+    DependentParametricExpressionCallExpr* E) {
+  // Get the transformed decl if it was in dependent context
+
+  ParametricExpressionDecl *D = E->getDecl();
+  ParametricExpressionDecl *NewDecl = nullptr;
+  if (D->getParent()->isDependentContext())
+    NewDecl = getDerived().TransformDecl(E->getBeginLoc(), D);
+
+  // Transform the BaseExpr
+
+  ExprResult BaseExprResult = getDerived().TransformExpr(E->getBaseExpr());
+  if (BaseExprResult.isInvalid())
+    return ExprError();
+
+  // Transform the arguments
+
+  bool ArgChanged = false;
+  SmallVector<Expr*, 8> Args;
+  if (getDerived().TransformExprs(E->getArgs(), E->getNumArgs(), true, Args,
+                                  &ArgChanged))
+    return ExprError();
+
+  if (!getDerived().AlwaysRebuild() && !NewDecl && !ArgChanged &&
+      BaseExprResult.get() == E->getBaseExpr())
+    return E;
+
+  return getDerived().RebuildDependentParametricExpressionCallExpr(
+                                                            NewDecl,
+                                                            NewBaseExpr,
+                                                            Args,
+                                                            E->getBeginLoc());
+}
+
+template<typename Derived>
+ExprResult
 TreeTransform<Derived>::TransformParametricExpressionCallExpr(
     ParametricExpressionCallExpr *E) {
   // Transform all the ParmVarDecls
@@ -12878,12 +12925,6 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
       NewParmVarDecls.push_back(PD);
     }
   }
-
-  // Transform the BaseExpr (which may be nullptr)
-
-  ExprResult BEResult = getDerived().TransformExpr(E->getBaseExpr());
-  if (BEResult.isInvalid())
-    return ExprError();
 
   // Transform the Body
 

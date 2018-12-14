@@ -6393,7 +6393,7 @@ void Sema::AddFunctionCandidates(const UnresolvedSetImpl &Fns,
     ArrayRef<Expr *> FunctionArgs = Args;
 
     if (ParametricExpressionDecl *PD =
-        dyn_cast<ParametricExpressionDecl>(F.getDecl())) {
+        dyn_cast_or_null<ParametricExpressionDecl>(F.getDecl())) {
       AddParametricExpressionCandidate(PD, F.getPair(), CandidateSet);
       return;
     }
@@ -6471,7 +6471,7 @@ void Sema::AddMethodCandidate(DeclAccessPair FoundDecl,
                                ObjectClassification, Args, CandidateSet,
                                SuppressUserConversions);
   } else if (ParametricExpressionDecl *PD =
-      dyn_cast<ParametricExpressionDecl>(Decl)) {
+      dyn_cast_or_null<ParametricExpressionDecl>(Decl)) {
     AddParametricExpressionCandidate(PD, FoundDecl, CandidateSet);
 
   } else {
@@ -8927,7 +8927,7 @@ Sema::AddArgumentDependentLookupCandidates(DeclarationName Name,
       if (FunctionTemplateDecl *FunTmpl = Cand->Function->getPrimaryTemplate())
         Fns.erase(FunTmpl);
     } else if (ParametricExpressionDecl *PD =
-        dyn_cast<ParametricExpressionDecl>(Cand->FoundDecl.getDecl())) {
+        dyn_cast_or_null<ParametricExpressionDecl>(Cand->FoundDecl.getDecl())) {
       Fns.erase(PD);
     }
 
@@ -9056,8 +9056,8 @@ bool clang::isBetterOverloadCandidate(
     return false;
 
   // parametric expressions are ambiguous with other viable candidates
-  if (isa<ParametricExpressionDecl>(Cand1.FoundDecl.getDecl()) ||
-      isa<ParametricExpressionDecl>(Cand2.FoundDecl.getDecl()))
+  if (dyn_cast_or_null<ParametricExpressionDecl>(Cand1.FoundDecl.getDecl()) ||
+      dyn_cast_or_null<ParametricExpressionDecl>(Cand2.FoundDecl.getDecl()))
      return false;
 
   // C++ [over.match.best]p1:
@@ -10750,7 +10750,7 @@ void OverloadCandidateSet::NoteCandidates(
     else if (Cand->IsSurrogate)
       NoteSurrogateCandidate(S, Cand);
     else if (ParametricExpressionDecl *PD =
-        dyn_cast<ParametricExpressionDecl>(Cand->FoundDecl.getDecl()))
+        dyn_cast_or_null<ParametricExpressionDecl>(Cand->FoundDecl.getDecl()))
       S.Diag(PD->getBeginLoc(),
              diag::note_ovl_parametric_expression_candidate);
     else {
@@ -12285,7 +12285,7 @@ Sema::CreateOverloadedUnaryOp(SourceLocation OpLoc, UnaryOperatorKind Opc,
 
       return MaybeBindToTemporary(TheCall);
     } else if (ParametricExpressionDecl *PD =
-        dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
       return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
     } else {
       // We matched a built-in operator. Convert the arguments, then
@@ -12534,7 +12534,7 @@ Sema::CreateOverloadedBinOp(SourceLocation OpLoc,
 
         return MaybeBindToTemporary(TheCall);
       } else if (ParametricExpressionDecl *PD =
-          dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+          dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
         return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
       } else {
         // We matched a built-in operator. Convert the arguments, then
@@ -13226,7 +13226,7 @@ Sema::BuildCallToObjectOfClassType(Scope *S, Expr *Obj,
 
   if (Best->Function == nullptr) {
     if (ParametricExpressionDecl *PD =
-        dyn_cast<ParametricExpressionDecl>(Best->FoundDecl.getDecl()))
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl()))
       return ActOnParametricExpressionCallExpr(PD, Obj, Args, LParenLoc);
 
     // Since there is no function declaration, this is one of the

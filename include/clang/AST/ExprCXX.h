@@ -4811,7 +4811,8 @@ public:
   static ParametricExpressionIdExpr *Create(ASTContext &C, SourceLocation BL,
                                             ParametricExpressionDecl *D,
                                             Expr* Base = nullptr) {
-    return new (C) ParametricExpressionIdExpr(BL, C.ParametricExpressionIdTy, D, Base);
+    return new (C) ParametricExpressionIdExpr(BL, C.ParametricExpressionIdTy,
+                                              D, Base);
   }
 
   ParametricExpressionDecl *getDefinitionDecl() { return DefinitionDecl; }
@@ -4831,42 +4832,90 @@ public:
   }
 };
 
+// DependentParametricExpressionCallExpr
+//                                - A call a parametric expression that
+//                                  contains dependent arguments
+//                                
+class DependentParametricExpressionCallExpr : public Expr {
+  SourceLocation BeginLoc;
+  ParametricExpressionDecl *TheDecl;
+  Expr *BaseExpr;
+  Expr **CallArgs;
+  unsigned NumArgs;
+
+  DependentParametricExpressionCallExpr(SourceLocation BL, QualType QT,
+                                        ParametricExpressionDecl *D,
+                                        Expr** Args, unsigned NumArgs)
+    : Expr(DependentParametricExpressionCallExprClass, QT, VK_RValue,
+           OK_Ordinary, /*TypeDependent*/ true, /*ValueDependent*/ false,
+           /*InstantiationDependent*/ false, /*ContainsPack*/ false)
+      BeginLoc(BL),
+      TheDecl(D),
+      BaseExpr(BaseExpr),
+      CallArgs(Args),
+      NumArgs(NumArgs) {}
+
+  ParametricExpressionDecl *getDecl() const {
+    return TheDecl;
+  }
+
+  Expr* getBaseExpr() {
+    return BaseExpr;
+  }
+
+  const Expr *const *getArgs() const {
+    return Args;
+  }
+  unsigned getNumArgs() const { return NumArgs; }
+
+  // Iterators
+  child_range children() {
+    if (BaseExpr)
+      return child_range(&BaseExpr, &BaseExpr + NumArgs + 1);
+    return child_range(CallArgs, CallArgs + NumArgs);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == DependentParametricExpressionCallExprClass;
+  }
+};
+
 // ParametricExpressionCallExpr - A compound statement with RAII scope that
 //                                evaluates as an expression based on its
 //                                return value
 //                           
 class ParametricExpressionCallExpr : public Expr {
   SourceLocation BeginLoc;
-  unsigned NumParams = 0;
   ParmVarDecl** ParamInfo;
   Stmt **Children;
-  // The BaseExpr is in          Children[0]
-  // The CompoundStmt Body is in Children[1]
-  // The Param Init Exprs are in Children[2] to Children[2 + NumParams]
+  unsigned NumParams = 0;
+  // The CompoundStmt Body is in Children[0]
+  // The Param Init Exprs are in Children[1] to Children[1 + NumParams]
 
-  ParametricExpressionCallExpr(SourceLocation BL, QualType QT, ExprValueKind VK)
+  ParametricExpressionCallExpr(SourceLocation BL,
+                               QualType QT, ExprValueKind VK)
     : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL) {}
 public:
   static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
-                                              CompoundStmt *B, Expr* BaseExpr,
+                                              CompoundStmt *B,
                                               QualType QT, ExprValueKind VK,
                                               ArrayRef<ParmVarDecl *> Params);
-  Expr *getBaseExpr() const {
-    return static_cast<Expr*>(Children[0]);
-  }
 
-  void setBaseExpr(Expr* BaseExpr) {
-    Children[0] = BaseExpr;
-  }
+  static DependentParametricExpressionCallExpr *
+  CreateDependent(ASTContext &C, SourceLocation BL, ParametricExpressionDecl *D,
+                  Expr* BaseExpr, ArrayRef<Expr *> CallArgs);
 
   CompoundStmt *getBody() const {
-    return static_cast<CompoundStmt*>(Children[1]);
+    return static_cast<CompoundStmt*>(Children[0]);
   }
 
   void setBody(CompoundStmt *Body) {
-    Children[2] = Body;
+    Children[0] = Body;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
@@ -4881,20 +4930,15 @@ public:
   }
 
   ArrayRef<Expr *> init_expressions() const {
-    return {reinterpret_cast<Expr**>(Children) + 2, NumParams};
+    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
   }
   MutableArrayRef<Expr *> init_expressions() {
-    return {reinterpret_cast<Expr**>(Children) + 2, NumParams};
+    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
   }
 
   // Iterators
   child_range children() {
-    if (getBaseExpr()) {
-      return child_range(Children, Children + 2 + NumParams);
-    }
-    else {
-      return child_range(Children + 1, Children + 2 + NumParams);
-    }
+    return child_range(Children, Children + 1 + NumParams);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }

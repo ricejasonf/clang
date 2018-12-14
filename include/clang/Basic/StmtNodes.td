@@ -95,6 +95,7 @@ def GenericSelectionExpr : DStmt<Expr>;
 def PseudoObjectExpr : DStmt<Expr>;
 def ParametricExpressionIdExpr : DStmt<Expr>;
 def ParametricExpressionCallExpr : DStmt<Expr>;
+def DependentParametricExpressionCallExpr : DStmt<Expr>;
 
 // Atomic expressions
 def AtomicExpr : DStmt<Expr>;

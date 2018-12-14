@@ -1453,11 +1453,11 @@ void ArrayTypeTraitExpr::anchor() {}
 
 ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
                                         ASTContext &C, SourceLocation BL,
-                                        CompoundStmt *Body, Expr *BaseExpr,
+                                        CompoundStmt *Body,
                                         QualType QT, ExprValueKind VK,
                                         ArrayRef<ParmVarDecl *> Params) {
   ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(
-                                                                  BL, QT, VK);
+                                                                BL, QT, VK);
   New->NumParams = Params.size();
 
   if (!Params.empty()) {
@@ -1465,15 +1465,34 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
     std::copy(Params.begin(), Params.end(), New->ParamInfo);
   }
 
-  New->Children = new (C) Stmt*[Params.size() + 2];
+  New->Children = new (C) Stmt*[Params.size() + 1];
 
-  New->Children[0] = BaseExpr;
-  New->Children[1] = Body;
-  for (unsigned i = 0; i < Params.size(); i++) {
-    New->Children[i + 2] = Params[i]->getInit();
+  New->Children[0] = Body;
+  for (unsigned I = 0; I < Params.size(); ++I) {
+    New->Children[I + 1] = Params[I]->getInit();
   }
 
   return New;
 }
 
+DependentParametricExpressionCallExpr *
+ParametricExpressionCallExpr::CreateDependent(
+                                        ASTContext &C, SourceLocation BL,
+                                        ParametricExpressionDecl *D,
+                                        Expr* BaseExpr,
+                                        ArrayRef<Expr *> CallArgs) {
+  DependentParametricExpressionCallExpr *
+  New = new (C) DependentParametricExpressionCallExpr(BL, C.DependentTy, D,
+                                                      BaseExpr, CallArgs);
 
+  for (unsigned I = 0; I < CallArgs.size(); ++I) {
+    if (CallArgs[I]->isValueDependent())
+      New->setValueDependent(true);
+    if (CallArgs[I]->isInstantiationDependent())
+      New->setInstantiationDependent(true);
+    if (CallArgs[I]->containsUnexpandedParameterPack())
+      New->setContainsUnexpandedParameterPack(true);
+  }
+
+  return New;
+}
