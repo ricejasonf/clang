@@ -703,14 +703,21 @@ void ASTStmtReader::VisitMemberExpr(MemberExpr *E) {
          "It's a subclass, we must advance Idx!");
 }
 
-void ASTStmtReader::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *E) {
+void ASTStmtReader::VisitParametricExpressionIdExpr(
+                                        ParametricExpressionIdExpr *E) {
   // TODO JASON
   // TODO set BeginLoc
   // TODO set DefinitionDecl (how do we get that?)
   // TODO add friend class ASTStmtReader
 }
 
-void ASTStmtReader::VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *E) {
+void ASTStmtReader::VisitParametricExpressionCallExpr(
+                                        ParametricExpressionCallExpr *E) {
+  llvm_unreachable("Cannot read ParametricExpressionCallExpr nodes");
+}
+
+void ASTStmtReader::VisitDependentParametricExpressionCallExpr(
+                                        DependentParametricExpressionCallExpr *E) {
   llvm_unreachable("Cannot read ParametricExpressionCallExpr nodes");
 }
 

@@ -1225,6 +1225,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::OMPTargetTeamsDistributeSimdDirectiveClass:
     case Stmt::ParametricExpressionIdExprClass:
     case Stmt::ParametricExpressionCallExprClass:
+    case Stmt::DependentParametricExpressionCallExprClass:
     case Stmt::ParametricExpressionReturnStmtClass:
     case Stmt::CapturedStmtClass: {
       const ExplodedNode *node = Bldr.generateSink(S, Pred, Pred->getState());

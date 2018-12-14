@@ -7961,7 +7961,7 @@ public:
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(
                                               ParametricExpressionIdExpr *Id,
-                                                   MultiExprArg CallArgExprs,
+                                                   ArrayRef<Expr*> CallArgExprs,
                                                    SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Id) &&
       "Expecting only ParametricExpressionIdExpr right now");
@@ -7983,11 +7983,12 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                                    Expr *BaseExpr,
-                                                   MultiExprArg CallArgExprs,
+                                                   ArrayRef<Expr*> CallArgExprs,
                                                    SourceLocation Loc) {
   // Defer instantiation if the args are value-dependent
   if (ParametricExpressionCallExpr::hasDependentArgs(CallArgExprs)) {
-    return ParametricExpressionCallExpr::CreateDependent(Loc, D, BaseExpr,
+    return ParametricExpressionCallExpr::CreateDependent(Context, Loc, D,
+                                                         BaseExpr,
                                                          CallArgExprs);
   }
 
@@ -8068,7 +8069,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
     if (CSResult.isInvalid())
       return ExprError();
 
-    return BuildParametricExpressionCallExpr(Loc, D
+    return BuildParametricExpressionCallExpr(Loc,
                                              CSResult.getAs<CompoundStmt>(),
                                              NewParmVarDecls);
   } else {
@@ -8078,8 +8079,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
 }
 
 ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
-                                             ParametricExpressionDecl *D,
-                                             CompoundStmt *InstantiatedBody,
+                                             CompoundStmt *Body,
                                              ArrayRef<ParmVarDecl *> Params) {
   // Assume type dependence if there is value dependent arguments
   ExprValueKind VK;
@@ -8087,23 +8087,17 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
 
   // The Body is not instantiated until all args are non-dependent
   // (ie value-dependent)
-  if (InstantiatedBody) {
-    ParametricExpressionReturnStmtVisitor R(*this);
-    R.TraverseStmt(InstantiatedBody);
-    VK = R.getResultType()->isReferenceType() ? VK_LValue : VK_RValue;
-    T = R.getResultType().getNonReferenceType();
-    // Default to returning `void`
-    // TODO consider QualType() as the placeholder for default
-    if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr())
-      T = Context.VoidTy;
-  } else {
-    VK = VK_RValue;
-    T = Context.DependentTy;
-  }
+  ParametricExpressionReturnStmtVisitor R(*this);
+  R.TraverseStmt(Body);
+  VK = R.getResultType()->isReferenceType() ? VK_LValue : VK_RValue;
+  T = R.getResultType().getNonReferenceType();
+  // Default to returning `void`
+  // TODO consider QualType() as the placeholder for default
+  if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr())
+    T = Context.VoidTy;
 
-  return ParametricExpressionCallExpr::Create(Context, BeginLoc, D,
-                                              InstantiatedBody,
-                                              T, VK, Params);
+  return ParametricExpressionCallExpr::Create(Context, BeginLoc,
+                                              Body, T, VK, Params);
 }
 
 // used in ActOnParametricExpression and

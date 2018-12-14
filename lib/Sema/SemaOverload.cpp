@@ -12286,7 +12286,7 @@ Sema::CreateOverloadedUnaryOp(SourceLocation OpLoc, UnaryOperatorKind Opc,
       return MaybeBindToTemporary(TheCall);
     } else if (ParametricExpressionDecl *PD =
         dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
-      return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
+      return ActOnParametricExpressionCallExpr(PD, nullptr, ArgsArray, OpLoc);
     } else {
       // We matched a built-in operator. Convert the arguments, then
       // break out so that we will build the appropriate built-in

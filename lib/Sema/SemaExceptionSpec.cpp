@@ -1222,6 +1222,7 @@ CanThrowResult Sema::canThrow(const Expr *E) {
   case Expr::CXXUnresolvedConstructExprClass:
   case Expr::DependentScopeDeclRefExprClass:
   case Expr::CXXFoldExprClass:
+  case Expr::DependentParametricExpressionCallExprClass:
     return CT_Dependent;
 
   case Expr::AsTypeExprClass:

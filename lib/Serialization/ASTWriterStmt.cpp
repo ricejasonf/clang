@@ -1736,6 +1736,11 @@ void ASTStmtWriter::VisitParametricExpressionCallExpr(ParametricExpressionCallEx
   llvm_unreachable("Cannot write ParametricExpressionCallExpr nodes");
 }
 
+void ASTStmtWriter::VisitDependentParametricExpressionCallExpr(
+                                        DependentParametricExpressionCallExpr *E) {
+  llvm_unreachable("Cannot write ParametricExpressionCallExpr nodes");
+}
+
 //===----------------------------------------------------------------------===//
 // CUDA Expressions and Statements.
 //===----------------------------------------------------------------------===//

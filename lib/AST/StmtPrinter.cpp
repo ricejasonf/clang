@@ -2808,8 +2808,13 @@ void StmtPrinter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *No
   OS << Node->getDefinitionDecl()->getName();
 }
 
+void StmtPrinter::VisitDependentParametricExpressionCallExpr(
+                      DependentParametricExpressionCallExpr *Node) {
+  // TODO
+}
+
 void StmtPrinter::VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *Node) {
-  // TODO JASON might have to store the original CallExpr and print that idk
+  // TODO might have to store the original CallExpr and print that idk
 }
 
 //===----------------------------------------------------------------------===//

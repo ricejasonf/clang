@@ -1999,6 +1999,11 @@ void StmtProfiler::VisitParametricExpressionIdExpr(const ParametricExpressionIdE
   VisitExpr(S);
 }
 
+void StmtProfiler::VisitDependentParametricExpressionCallExpr(
+                      const DependentParametricExpressionCallExpr *S) {
+  VisitExpr(S);
+}
+
 void StmtProfiler::VisitParametricExpressionCallExpr(const ParametricExpressionCallExpr *S) {
   VisitExpr(S);
 }

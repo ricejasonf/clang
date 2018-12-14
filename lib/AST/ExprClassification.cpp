@@ -381,6 +381,7 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
     return Cl::CL_ClassTemporary;
 
   case Expr::ParametricExpressionCallExprClass:
+  case Expr::DependentParametricExpressionCallExprClass:
   case Expr::VAArgExprClass:
     return ClassifyUnnamed(Ctx, E->getType());
 

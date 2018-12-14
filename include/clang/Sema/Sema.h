@@ -4694,14 +4694,13 @@ public:
 
   ExprResult ActOnParametricExpressionCallExpr(
                         ParametricExpressionIdExpr *Fn,
-                        MultiExprArg ArgExprs, SourceLocation LParenLoc);
+                        ArrayRef<Expr*> ArgExprs, SourceLocation LParenLoc);
   ExprResult ActOnParametricExpressionCallExpr(
                         ParametricExpressionDecl *D,
-                        Expr *BaseExpr, MultiExprArg ArgExprs,
+                        Expr *BaseExpr, ArrayRef<Expr*> ArgExprs,
                         SourceLocation Loc);
   ExprResult BuildParametricExpressionCallExpr(
                         SourceLocation BeginLoc, CompoundStmt *Body,
-                        Expr *BaseExpr,
                         ArrayRef<ParmVarDecl*> Params);
   ParmVarDecl *BuildParametricExpressionParam(
                         ParmVarDecl *OldParam, Expr *ArgExpr);

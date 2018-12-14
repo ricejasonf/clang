@@ -3560,6 +3560,7 @@ recurse:
   case Expr::AtomicExprClass:
   case Expr::FixedPointLiteralClass:
   case Expr::ParametricExpressionCallExprClass:
+  case Expr::DependentParametricExpressionCallExprClass:
   {
     if (!NullOut) {
       // As bad as this diagnostic is, it's better than crashing.

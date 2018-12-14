@@ -1481,9 +1481,16 @@ ParametricExpressionCallExpr::CreateDependent(
                                         ParametricExpressionDecl *D,
                                         Expr* BaseExpr,
                                         ArrayRef<Expr *> CallArgs) {
+  Expr** Args;
+  if (!CallArgs.empty()) {
+    Args = new (C) Expr*[CallArgs.size()];
+    std::copy(CallArgs.begin(), CallArgs.end(), Args);
+  }
+
   DependentParametricExpressionCallExpr *
   New = new (C) DependentParametricExpressionCallExpr(BL, C.DependentTy, D,
-                                                      BaseExpr, CallArgs);
+                                                      BaseExpr, Args,
+                                                      CallArgs.size());
 
   for (unsigned I = 0; I < CallArgs.size(); ++I) {
     if (CallArgs[I]->isValueDependent())
@@ -1495,4 +1502,14 @@ ParametricExpressionCallExpr::CreateDependent(
   }
 
   return New;
+}
+
+bool ParametricExpressionCallExpr::hasDependentArgs(ArrayRef<Expr *> Args) {
+  for (unsigned I = 0; I < Args.size(); ++I) {
+    if (Args[I]->isValueDependent() ||
+        Args[I]->isInstantiationDependent())
+      return true;
+  }
+
+  return false;
 }

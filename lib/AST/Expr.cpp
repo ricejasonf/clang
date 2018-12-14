@@ -3164,6 +3164,7 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case ConvertVectorExprClass:
   case AsTypeExprClass:
   case ParametricExpressionCallExprClass:
+  case DependentParametricExpressionCallExprClass:
     // These have a side-effect if any subexpression does.
     break;
 

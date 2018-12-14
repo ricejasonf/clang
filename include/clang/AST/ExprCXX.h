@@ -4843,18 +4843,19 @@ class DependentParametricExpressionCallExpr : public Expr {
   Expr **CallArgs;
   unsigned NumArgs;
 
+public:
   DependentParametricExpressionCallExpr(SourceLocation BL, QualType QT,
                                         ParametricExpressionDecl *D,
+                                        Expr* BaseExpr,
                                         Expr** Args, unsigned NumArgs)
     : Expr(DependentParametricExpressionCallExprClass, QT, VK_RValue,
            OK_Ordinary, /*TypeDependent*/ true, /*ValueDependent*/ false,
-           /*InstantiationDependent*/ false, /*ContainsPack*/ false)
+           /*InstantiationDependent*/ false, /*ContainsPack*/ false),
       BeginLoc(BL),
       TheDecl(D),
       BaseExpr(BaseExpr),
       CallArgs(Args),
       NumArgs(NumArgs) {}
-
   ParametricExpressionDecl *getDecl() const {
     return TheDecl;
   }
@@ -4863,16 +4864,19 @@ class DependentParametricExpressionCallExpr : public Expr {
     return BaseExpr;
   }
 
-  const Expr *const *getArgs() const {
-    return Args;
+  Expr **getArgs() {
+    return CallArgs;
   }
+
   unsigned getNumArgs() const { return NumArgs; }
 
   // Iterators
   child_range children() {
     if (BaseExpr)
-      return child_range(&BaseExpr, &BaseExpr + NumArgs + 1);
-    return child_range(CallArgs, CallArgs + NumArgs);
+      return child_range(reinterpret_cast<Stmt**>(&BaseExpr),
+                         reinterpret_cast<Stmt**>(&BaseExpr) + NumArgs + 1);
+    return child_range(reinterpret_cast<Stmt**>(CallArgs), 
+                       reinterpret_cast<Stmt**>(CallArgs) + NumArgs);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
@@ -4909,6 +4913,8 @@ public:
   static DependentParametricExpressionCallExpr *
   CreateDependent(ASTContext &C, SourceLocation BL, ParametricExpressionDecl *D,
                   Expr* BaseExpr, ArrayRef<Expr *> CallArgs);
+
+  static bool hasDependentArgs(ArrayRef<Expr *> Args);
 
   CompoundStmt *getBody() const {
     return static_cast<CompoundStmt*>(Children[0]);
