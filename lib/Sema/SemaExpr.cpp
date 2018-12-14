@@ -2803,6 +2803,10 @@ ExprResult Sema::BuildDeclarationNameExpr(
     return ExprError();
   }
 
+  if (ParametricExpressionDecl *PD = dyn_cast<ParametricExpressionDecl>(D)) {
+    return ParametricExpressionIdExpr::Create(Context, Loc, PD);
+  }
+
   // Make sure that we're referring to a value.
   ValueDecl *VD = dyn_cast<ValueDecl>(D);
   if (!VD) {
