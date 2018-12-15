@@ -12295,9 +12295,12 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
   if (DS.isInlineSpecified())
     Diag(DS.getInlineSpecLoc(), diag::err_inline_non_function)
         << getLangOpts().CPlusPlus17;
-  if (DS.isConstexprSpecified())
+  if (DS.isConstexprSpecified()) {
+    if(D.getContext() !=
+        DeclaratorContext::ParametricExpressionParameterContext)
     Diag(DS.getConstexprSpecLoc(), diag::err_invalid_constexpr)
       << 0;
+  }
 
   DiagnoseFunctionSpecifiers(DS);
 
@@ -12364,6 +12367,12 @@ Decl *Sema::ActOnParamDeclarator(Scope *S, Declarator &D) {
         DeclaratorContext::ParametricExpressionParameterContext
       && "`using` param only allowed in parametric-expression");
     New->setUsingSpecified(true);
+  }
+  if (DS.isConstexprSpecified()) {
+    assert(D.getContext() ==
+        DeclaratorContext::ParametricExpressionParameterContext
+      && "`constexpr` param only allowed in parametric-expression");
+    New->setConstexpr(true);
   }
 
   if (D.isInvalidType())

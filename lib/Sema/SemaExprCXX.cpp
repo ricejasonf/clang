@@ -8107,8 +8107,9 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
   QualType ArgTy;
   if (!ArgExpr) {
     ArgTy = Old->getType();
-  } else if (Old->isUsingSpecified()) {
-    // The type could be an abstract type
+  } else if (Old->isConstexpr() || Old->isUsingSpecified()) {
+    // constexpr/using params have the same type as the argument
+    // The type could be an abstract type for `using` params
     ArgTy = ArgExpr->getType();
   } else if (ArgExpr->getType()->isPlaceholderType()) {
     CheckPlaceholderExpr(ArgExpr);
@@ -8119,6 +8120,10 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
     ArgTy = Context.getRValueReferenceType(ArgExpr->getType());
   }
 
+  // maintain constness
+  if (Old->getType().isConstQualified())
+    ArgTy.addConst();
+
   TypeSourceInfo *NewDI = Context.CreateTypeSourceInfo(ArgTy);
   ParmVarDecl *New = ParmVarDecl::Create(Context,
                                          CurContext,
@@ -8128,8 +8133,7 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
                                          NewDI->getType(), NewDI,
                                          Old->getStorageClass(),
                                          /* DefArg */ nullptr);
-  // FIXME ParmVarDecls cannot be constexpr yet
-  // New->setConstexpr(Old->isConstexpr());
+  New->setConstexpr(Old->isConstexpr());
 
   if (ArgExpr && !Old->isUsingSpecified()) {
     ExprResult InitExprResult = MaybeBindToTemporary(ArgExpr);

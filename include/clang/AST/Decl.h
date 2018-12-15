@@ -874,8 +874,9 @@ private:
     unsigned SClass : 3;
     unsigned TSCSpec : 2;
     unsigned InitStyle : 2;
+    unsigned IsConstexpr : 1;
   };
-  enum { NumVarDeclBits = 7 };
+  enum { NumVarDeclBits = 8 };
 
 protected:
   enum { NumParameterIndexBits = 8 };
@@ -960,9 +961,6 @@ protected:
 
     /// Whether this variable has (C++1z) inline explicitly specified.
     unsigned IsInlineSpecified : 1;
-
-    /// Whether this variable is (C++0x) constexpr.
-    unsigned IsConstexpr : 1;
 
     /// Whether this variable is the implicit variable for a lambda
     /// init-capture.
@@ -1390,11 +1388,10 @@ public:
 
   /// Whether this variable is (C++11) constexpr.
   bool isConstexpr() const {
-    return isa<ParmVarDecl>(this) ? false : NonParmVarDeclBits.IsConstexpr;
+    return VarDeclBits.IsConstexpr;
   }
   void setConstexpr(bool IC) {
-    assert(!isa<ParmVarDecl>(this));
-    NonParmVarDeclBits.IsConstexpr = IC;
+    VarDeclBits.IsConstexpr = IC;
   }
 
   /// Whether this variable is the implicit variable for a lambda init-capture.

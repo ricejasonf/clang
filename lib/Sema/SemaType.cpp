@@ -5054,7 +5054,15 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
   if (D.getContext() == DeclaratorContext::ParametricExpressionParameterContext &&
       !D.hasEllipsis()) {
     // This might not be the correct place to check these
-    if (T.hasLocalQualifiers() || T->isReferenceType() || T->isPointerType()) {
+    if (T.isLocalVolatileQualified()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+    if (T.isLocalRestrictQualified()) {
+      S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
+      D.setInvalidType(true);
+    }
+    if (T->isReferenceType() || T->isPointerType()) {
       S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
       D.setInvalidType(true);
     }
@@ -5067,7 +5075,10 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     }
 
     // Make the type "dependent"
+    unsigned IsConst = T.isConstQualified();
     T = S.Context.DependentTy;
+    if (IsConst)
+      T.addConst();
   }
 
   assert(!T.isNull() && "T must not be null at the end of this function");
