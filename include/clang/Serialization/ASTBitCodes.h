@@ -1536,6 +1536,9 @@ namespace serialization {
 
       /// An OMPDeclareReductionDecl record.
       DECL_OMP_DECLARE_REDUCTION,
+
+      // A parametric expression
+      DECL_PARAMETRIC_EXPRESSION,
     };
 
     /// Record codes for each kind of statement or expression.

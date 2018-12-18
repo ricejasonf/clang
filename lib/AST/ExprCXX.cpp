@@ -1472,6 +1472,11 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
     New->Children[I + 1] = Params[I]->getInit();
   }
 
+  for (unsigned I = 0; I < CallArgs.size(); ++I) {
+    if (CallArgs[I]->containsUnexpandedParameterPack())
+      New->setContainsUnexpandedParameterPack(true);
+  }
+
   return New;
 }
 

@@ -1728,6 +1728,7 @@ void ASTStmtWriter::VisitTypoExpr(TypoExpr *E) {
 
 void ASTStmtWriter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *E) {
   // TODO JASON no idea if this is enough
+  llvm_unreachable("Cannot write ParametricExpressionIdExpr nodes");
   VisitExpr(E);
   Record.AddSourceLocation(E->getBeginLoc());
 }
@@ -1738,7 +1739,7 @@ void ASTStmtWriter::VisitParametricExpressionCallExpr(ParametricExpressionCallEx
 
 void ASTStmtWriter::VisitDependentParametricExpressionCallExpr(
                                         DependentParametricExpressionCallExpr *E) {
-  llvm_unreachable("Cannot write ParametricExpressionCallExpr nodes");
+  llvm_unreachable("Cannot write DependentParametricExpressionCallExpr nodes");
 }
 
 //===----------------------------------------------------------------------===//

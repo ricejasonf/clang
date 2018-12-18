@@ -447,6 +447,7 @@ namespace clang {
     void VisitOMPThreadPrivateDecl(OMPThreadPrivateDecl *D);
     void VisitOMPDeclareReductionDecl(OMPDeclareReductionDecl *D);
     void VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D);
+    void VisitParametricExpressionDecl(ParametricExpressionDecl *D);
   };
 
 } // namespace clang
@@ -2642,6 +2643,10 @@ void ASTDeclReader::VisitOMPDeclareReductionDecl(OMPDeclareReductionDecl *D) {
 
 void ASTDeclReader::VisitOMPCapturedExprDecl(OMPCapturedExprDecl *D) {
   VisitVarDecl(D);
+}
+
+void ASTDeclReader::VisitParametricExpressionDecl(ParametricExpressionDecl *D) {
+  VisitNamedDecl(D);
 }
 
 //===----------------------------------------------------------------------===//

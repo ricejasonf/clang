@@ -5324,6 +5324,10 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
   if (Result.isInvalid()) return ExprError();
   Fn = Result.get();
 
+  if (ParametricExpressionIdExpr *PE =
+      dyn_cast<ParametricExpressionIdExpr>(Fn))
+    return ActOnParametricExpressionCallExpr(PE, ArgExprs, LParenLoc);
+
   if (checkArgsForPlaceholders(*this, ArgExprs))
     return ExprError();
 
@@ -5371,10 +5375,6 @@ ExprResult Sema::ActOnCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
             Context, Fn, ArgExprs, Context.DependentTy, VK_RValue, RParenLoc);
       }
     }
-
-    if (ParametricExpressionIdExpr *PE =
-        dyn_cast<ParametricExpressionIdExpr>(Fn))
-      return ActOnParametricExpressionCallExpr(PE, ArgExprs, LParenLoc);
 
     // Determine whether this is a call to an object (C++ [over.call.object]).
     if (Fn->getType()->isRecordType())
