@@ -6926,6 +6926,8 @@ public:
   bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                         SmallVectorImpl<SourceLocation> &CommaLocs,
                                  SmallVectorImpl<Expr *> &Outputs);
+  bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                                 SmallVectorImpl<Expr *> &Outputs);
 
   //===--------------------------------------------------------------------===//
   // C++ Template Argument Deduction (C++ [temp.deduct])

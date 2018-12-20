@@ -946,6 +946,20 @@ bool Sema::containsUnexpandedParameterPacks(Declarator &D) {
 bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                             SmallVectorImpl<SourceLocation> &CommaLocs,
                                     SmallVectorImpl<Expr *> &Outputs) {
+  unsigned InitialSize = Outputs.size();
+  if (TryExpandResolvedPackExpansion(Expansion, Outputs))
+    return true;
+
+  // Fake the comma location funk
+  unsigned ExprsAdded = Outputs.size() - InitialSize;
+  for (unsigned I = 1; I < ExprsAdded; ++I)
+    CommaLocs.push_back(SourceLocation());
+
+  return false;
+}
+
+bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                                    SmallVectorImpl<Expr *> &Outputs) {
   if (!Expansion)
     return true;
 
@@ -953,20 +967,11 @@ bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
     Outputs.push_back(Expansion);
     return false;
   }
-  unsigned InitialSize = Outputs.size();
 
   // If it is not type dependent then we can expand it
-  bool IsFailed = SubstExprs(
-                    ArrayRef<Expr*>(reinterpret_cast<Expr**>(&Expansion), 
+  return SubstExprs(ArrayRef<Expr*>(reinterpret_cast<Expr**>(&Expansion), 
                                     reinterpret_cast<Expr**>(&Expansion) + 1),
                     /*IsCall=*/false, /*TemplateArgs=*/{}, Outputs);
-
-  // Fake the comma location funk
-  unsigned ExprsAdded = Outputs.size() - InitialSize;
-  for (unsigned I = 1; I < ExprsAdded; ++I)
-    CommaLocs.push_back(SourceLocation());
-
-  return IsFailed;
 }
 
 namespace {
