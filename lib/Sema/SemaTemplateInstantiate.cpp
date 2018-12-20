@@ -889,6 +889,11 @@ namespace {
     /// pack.
     ExprResult TransformFunctionParmPackExpr(FunctionParmPackExpr *E);
 
+    // Transform a ResolvedUnexpandedPackExpr which was built when a
+    // parametric expression return an unexpanded parameter pack.
+    ExprResult TransformResolvedUnexpandedPackExpr(
+                                        ResolvedUnexpandedPackExpr *E);
+
     QualType TransformFunctionProtoType(TypeLocBuilder &TLB,
                                         FunctionProtoTypeLoc TL) {
       // Call the base version; it will forward to our overridden version below.
@@ -1535,6 +1540,26 @@ TemplateInstantiator::TransformSubstTemplateTypeParmPackType(
     = TLB.push<SubstTemplateTypeParmTypeLoc>(Result);
   NewTL.setNameLoc(TL.getNameLoc());
   return Result;
+}
+
+ExprResult
+TemplateInstantiator::TransformResolvedUnexpandedPackExpr(
+                                    ResolvedUnexpandedPackExpr *E) {
+  if (getSema().ArgumentPackSubstitutionIndex != -1)
+    return TransformExpr(
+        E->getExpansion(getSema().ArgumentPackSubstitutionIndex));
+
+  if (!AlwaysRebuild())
+    return E;
+
+  SmallVector<Expr*, 12> NewExprs;
+  if (TransformExprs(E->getExprs(), E->getNumExprs(),
+                     /*IsCall=*/false, NewExprs))
+    return ExprError();
+      
+  return ResolvedUnexpandedPackExpr::Create(SemaRef.Context,
+                                            E->getBeginLoc(),
+                                            NewExprs);
 }
 
 /// Perform substitution on the type T with a given set of template

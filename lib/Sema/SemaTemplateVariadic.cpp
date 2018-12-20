@@ -58,6 +58,9 @@ namespace {
       if (T->getDepth() < DepthLimit)
         Unexpanded.push_back({T, Loc});
     }
+    void addUnexpanded(ResolvedUnexpandedPackExpr *E) {
+      Unexpanded.push_back({E, E->getBeginLoc()});
+    }
 
   public:
     explicit CollectUnexpandedParameterPacksVisitor(
@@ -95,6 +98,11 @@ namespace {
       if (E->getDecl()->isParameterPack())
         addUnexpanded(E->getDecl(), E->getLocation());
 
+      return true;
+    }
+
+    bool VisitResolvedUnexpandedPackExpr(ResolvedUnexpandedPackExpr *E) {
+      addUnexpanded(E);
       return true;
     }
 
@@ -345,7 +353,7 @@ Sema::DiagnoseUnexpandedParameterPacks(SourceLocation Loc,
     if (const TemplateTypeParmType *TTP
           = Unexpanded[I].first.dyn_cast<const TemplateTypeParmType *>())
       Name = TTP->getIdentifier();
-    else
+    else if (Unexpanded[I].first.is<NamedDecl *>())
       Name = Unexpanded[I].first.get<NamedDecl *>()->getIdentifier();
 
     if (Name && NamesKnown.insert(Name).second)
@@ -643,12 +651,16 @@ bool Sema::CheckParameterPacksForExpansion(
     unsigned Depth = 0, Index = 0;
     IdentifierInfo *Name;
     bool IsFunctionParameterPack = false;
+    ResolvedUnexpandedPackExpr *ResolvedPack = nullptr;
 
     if (const TemplateTypeParmType *TTP
         = i->first.dyn_cast<const TemplateTypeParmType *>()) {
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
       Name = TTP->getIdentifier();
+    } else if (ResolvedUnexpandedPackExpr *RP
+        = i->first.dyn_cast<ResolvedUnexpandedPackExpr*>()) {
+      ResolvedPack = RP;
     } else {
       NamedDecl *ND = i->first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND))
@@ -677,6 +689,8 @@ bool Sema::CheckParameterPacksForExpansion(
         ShouldExpand = false;
         continue;
       }
+    } else if (ResolvedPack) {
+      NewPackSize = ResolvedPack->getNumExprs();
     } else {
       // If we don't have a template argument at this depth/index, then we
       // cannot expand the pack expansion. Make a note of this, but we still
@@ -695,7 +709,8 @@ bool Sema::CheckParameterPacksForExpansion(
     //   Template argument deduction can extend the sequence of template
     //   arguments corresponding to a template parameter pack, even when the
     //   sequence contains explicitly specified template arguments.
-    if (!IsFunctionParameterPack && CurrentInstantiationScope) {
+    if (!IsFunctionParameterPack && !ResolvedPack &&
+        CurrentInstantiationScope) {
       if (NamedDecl *PartialPack
                     = CurrentInstantiationScope->getPartiallySubstitutedPack()){
         unsigned PartialDepth, PartialIndex;
@@ -777,6 +792,12 @@ Optional<unsigned> Sema::getNumArgumentsInExpansion(QualType T,
           = Unexpanded[I].first.dyn_cast<const TemplateTypeParmType *>()) {
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
+    } else if (ResolvedUnexpandedPackExpr *PE
+          = Unexpanded[I].first.dyn_cast<ResolvedUnexpandedPackExpr *>()) {
+      unsigned Size = PE->getNumExprs();
+      assert((!Result || *Result == Size) && "inconsistent pack sizes");
+      Result = Size;
+      continue;
     } else {
       NamedDecl *ND = Unexpanded[I].first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND)) {
@@ -920,6 +941,32 @@ bool Sema::containsUnexpandedParameterPacks(Declarator &D) {
   }
 
   return false;
+}
+
+bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                            SmallVectorImpl<SourceLocation> &CommaLocs,
+                                    SmallVectorImpl<Expr *> &Outputs) {
+  if (!Expansion)
+    return true;
+
+  if (Expansion->getPattern()->isTypeDependent()) {
+    Outputs.push_back(Expansion);
+    return false;
+  }
+  unsigned InitialSize = Outputs.size();
+
+  // If it is not type dependent then we can expand it
+  bool IsFailed = SubstExprs(
+                    ArrayRef<Expr*>(reinterpret_cast<Expr**>(&Expansion), 
+                                    reinterpret_cast<Expr**>(&Expansion) + 1),
+                    /*IsCall=*/false, /*TemplateArgs=*/{}, Outputs);
+
+  // Fake the comma location funk
+  unsigned ExprsAdded = Outputs.size() - InitialSize;
+  for (unsigned I = 1; I < ExprsAdded; ++I)
+    CommaLocs.push_back(SourceLocation());
+
+  return IsFailed;
 }
 
 namespace {

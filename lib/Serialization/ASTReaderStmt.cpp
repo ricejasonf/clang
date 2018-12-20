@@ -704,7 +704,7 @@ void ASTStmtReader::VisitMemberExpr(MemberExpr *E) {
 }
 
 void ASTStmtReader::VisitParametricExpressionIdExpr(
-                                        ParametricExpressionIdExpr *E) {
+                                    ParametricExpressionIdExpr *E) {
   // TODO JASON
   // TODO set BeginLoc
   // TODO set DefinitionDecl (how do we get that?)
@@ -712,13 +712,18 @@ void ASTStmtReader::VisitParametricExpressionIdExpr(
 }
 
 void ASTStmtReader::VisitParametricExpressionCallExpr(
-                                        ParametricExpressionCallExpr *E) {
+                                  ParametricExpressionCallExpr *E) {
   llvm_unreachable("Cannot read ParametricExpressionCallExpr nodes");
 }
 
 void ASTStmtReader::VisitDependentParametricExpressionCallExpr(
-                                        DependentParametricExpressionCallExpr *E) {
+                         DependentParametricExpressionCallExpr *E) {
   llvm_unreachable("Cannot read ParametricExpressionCallExpr nodes");
+}
+
+void ASTStmtReader::VisitResolvedUnexpandedPackExpr(
+                                    ResolvedUnexpandedPackExpr *S) {
+  llvm_unreachable("Cannot read ResolvedUnexpandedPackExpr nodes");
 }
 
 void ASTStmtReader::VisitObjCIsaExpr(ObjCIsaExpr *E) {

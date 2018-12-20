@@ -1465,15 +1465,12 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
     std::copy(Params.begin(), Params.end(), New->ParamInfo);
   }
 
-  New->Children = new (C) Stmt*[Params.size() + 1];
+  New->Args = new (C) Expr*[Params.size()];
 
-  New->Children[0] = Body;
+  New->Body = Body;
   for (unsigned I = 0; I < Params.size(); ++I) {
-    New->Children[I + 1] = Params[I]->getInit();
-  }
-
-  for (unsigned I = 0; I < CallArgs.size(); ++I) {
-    if (CallArgs[I]->containsUnexpandedParameterPack())
+    New->Args[I] = Params[I]->getInit();
+    if (New->Args[I]->containsUnexpandedParameterPack())
       New->setContainsUnexpandedParameterPack(true);
   }
 
@@ -1511,10 +1508,30 @@ ParametricExpressionCallExpr::CreateDependent(
 
 bool ParametricExpressionCallExpr::hasDependentArgs(ArrayRef<Expr *> Args) {
   for (unsigned I = 0; I < Args.size(); ++I) {
-    if (Args[I]->isValueDependent() ||
+    if (Args[I]->isTypeDependent() ||
+        Args[I]->isValueDependent() ||
         Args[I]->isInstantiationDependent())
       return true;
   }
 
   return false;
+}
+
+ResolvedUnexpandedPackExpr *
+ResolvedUnexpandedPackExpr::Create(ASTContext &C, SourceLocation BL,
+                                   ArrayRef<Expr*> Exprs) {
+  // FIXME: Not sure what to specify for a type as it
+  //        is not technically dependent
+  //        (It shouldn't matter what the type is)
+  ResolvedUnexpandedPackExpr *
+  New = new (C) ResolvedUnexpandedPackExpr(BL, C.DependentTy);
+
+  New->NumExprs = Exprs.size();
+
+  if (!Exprs.empty()) {
+    New->Exprs = new (C) Expr*[Exprs.size()];
+    std::copy(Exprs.begin(), Exprs.end(), New->Exprs);
+  }
+
+  return New;
 }

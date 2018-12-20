@@ -7917,6 +7917,7 @@ class ParametricExpressionReturnStmtVisitor
 
   Sema &SemaRef;
   QualType ResultType;
+  bool HasError = false;
 
 public:
   ParametricExpressionReturnStmtVisitor(Sema &S)
@@ -7926,11 +7927,25 @@ public:
     return ResultType;
   }
 
+  bool hasError() {
+    return HasError;
+  }
+
   bool VisitParametricExpressionReturnStmt(ParametricExpressionReturnStmt *RS) {
     if (RS->isUnreachable())
       return true;
 
     Expr *RE = RS->getRetValue();
+
+    // If this wasn't a raw AST transformation we
+    // don't return crazy stuff like unexpanded packs
+    if (SemaRef.DiagnoseUnexpandedParameterPack(RE))
+      HasError = true;
+    if (RE->getType()->isPlaceholderType()) {
+      SemaRef.CheckPlaceholderExpr(RE);
+      HasError = true;
+    }
+
     QualType CurrentResultType{};
     if (RE) {
       CurrentResultType = RS->getRetValue()->getType();
@@ -8073,8 +8088,11 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                              CSResult.getAs<CompoundStmt>(),
                                              NewParmVarDecls);
   } else {
+    Expr *OutputExpr = cast<Expr>(Output);
+    if (OutputExpr->containsUnexpandedParameterPack())
+      return BuildResolvedUnexpandedPackExpr(Loc, OutputExpr, TemplateArgs);
     // Raw transformation with no AST wrapper
-    return SubstExpr(cast<Expr>(Output), TemplateArgs);
+    return SubstExpr(OutputExpr, TemplateArgs);
   }
 }
 
@@ -8089,6 +8107,10 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
   // (ie value-dependent)
   ParametricExpressionReturnStmtVisitor R(*this);
   R.TraverseStmt(Body);
+
+  if (R.hasError())
+    return ExprError();
+
   VK = R.getResultType()->isReferenceType() ? VK_LValue : VK_RValue;
   T = R.getResultType().getNonReferenceType();
   // Default to returning `void`
@@ -8146,4 +8168,21 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
     New->setInit(ArgExpr);
   }
   return New;
+}
+
+ExprResult Sema::BuildResolvedUnexpandedPackExpr(
+                                SourceLocation BeginLoc, Expr* Pattern, 
+                                MultiLevelTemplateArgumentList TemplateArgs) {
+  // Fake the PackExpansionExpr funk
+  Expr *Expansion = new (Context) PackExpansionExpr(Context.DependentTy,
+                                                    Pattern,
+                                                    SourceLocation(), 
+                                                    None);
+  SmallVector<Expr*, 12> ResultExprs;
+  if (SubstExprs(ArrayRef<Expr*>(&Expansion, &Expansion + 1),
+                 /*IsCall=*/false, TemplateArgs,
+                 ResultExprs))
+    return ExprError();
+
+  return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, ResultExprs);
 }

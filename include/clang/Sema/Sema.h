@@ -222,7 +222,8 @@ namespace threadSafety {
 
 // FIXME: No way to easily map from TemplateTypeParmTypes to
 // TemplateTypeParmDecls, so we have this horrible PointerUnion.
-typedef std::pair<llvm::PointerUnion<const TemplateTypeParmType*, NamedDecl*>,
+typedef std::pair<llvm::PointerUnion3<const TemplateTypeParmType*, NamedDecl*,
+                                      ResolvedUnexpandedPackExpr*>,
                   SourceLocation> UnexpandedParameterPack;
 
 /// Describes whether we've seen any nullability information for the given
@@ -3854,6 +3855,10 @@ public:
   StmtResult ActOnCapScopeReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp);
   StmtResult BuildParametricExpressionReturnStmt(SourceLocation ReturnLoc,
                                                  Expr *RetValExp);
+  ExprResult BuildResolvedUnexpandedPackExpr(
+                                SourceLocation BeginLoc, Expr* Pattern,
+                                MultiLevelTemplateArgumentList TemplateArgs);
+
 
   StmtResult ActOnGCCAsmStmt(SourceLocation AsmLoc, bool IsSimple,
                              bool IsVolatile, unsigned NumOutputs,
@@ -6917,6 +6922,10 @@ public:
   /// This is intended for use when transforming 'sizeof...(Arg)' in order to
   /// avoid actually expanding the pack where possible.
   Optional<unsigned> getFullyPackExpandedSize(TemplateArgument Arg);
+
+  bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
+                        SmallVectorImpl<SourceLocation> &CommaLocs,
+                                 SmallVectorImpl<Expr *> &Outputs);
 
   //===--------------------------------------------------------------------===//
   // C++ Template Argument Deduction (C++ [temp.deduct])

@@ -11000,6 +11000,7 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::ParametricExpressionIdExprClass:
   case Expr::ParametricExpressionCallExprClass:
   case Expr::DependentParametricExpressionCallExprClass:
+  case Expr::ResolvedUnexpandedPackExprClass:
     return ICEDiag(IK_NotICE, E->getBeginLoc());
 
   case Expr::InitListExprClass: {

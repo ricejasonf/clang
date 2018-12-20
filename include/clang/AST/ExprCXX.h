@@ -4894,10 +4894,9 @@ public:
 class ParametricExpressionCallExpr : public Expr {
   SourceLocation BeginLoc;
   ParmVarDecl** ParamInfo;
-  Stmt **Children;
+  CompoundStmt *Body;
+  Expr **Args;
   unsigned NumParams = 0;
-  // The CompoundStmt Body is in Children[0]
-  // The Param Init Exprs are in Children[1] to Children[1 + NumParams]
 
   ParametricExpressionCallExpr(SourceLocation BL,
                                QualType QT, ExprValueKind VK)
@@ -4917,11 +4916,11 @@ public:
   static bool hasDependentArgs(ArrayRef<Expr *> Args);
 
   CompoundStmt *getBody() const {
-    return static_cast<CompoundStmt*>(Children[0]);
+    return Body;
   }
 
-  void setBody(CompoundStmt *Body) {
-    Children[0] = Body;
+  void setBody(CompoundStmt *B) {
+    Body = B;
   }
 
   void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
@@ -4936,15 +4935,16 @@ public:
   }
 
   ArrayRef<Expr *> init_expressions() const {
-    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
+    return {Args, NumParams};
   }
   MutableArrayRef<Expr *> init_expressions() {
-    return {reinterpret_cast<Expr**>(Children) + 1, NumParams};
+    return {Args, NumParams};
   }
 
   // Iterators
   child_range children() {
-    return child_range(Children, Children + 1 + NumParams);
+    return child_range(reinterpret_cast<Stmt**>(Args),
+                       reinterpret_cast<Stmt**>(Args) + NumParams);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
@@ -4952,6 +4952,50 @@ public:
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == ParametricExpressionCallExprClass;
+  }
+};
+
+class ResolvedUnexpandedPackExpr : public Expr {
+  SourceLocation BeginLoc;
+  Expr **Exprs;
+  unsigned NumExprs = 0;
+
+  ResolvedUnexpandedPackExpr(SourceLocation BL, QualType QT)
+      : Expr(ResolvedUnexpandedPackExprClass, QT, VK_RValue,
+             OK_Ordinary, /*TypeDependent=*/false,
+             /*ValueDependent=*/false, /*InstantiationDependent=*/false,
+             /*ContainsUnexpandedParameterPack=*/true),
+        BeginLoc(BL) {}
+
+public:
+  static ResolvedUnexpandedPackExpr *Create(ASTContext &C,
+                                            SourceLocation BeginLoc,
+                                            ArrayRef<Expr*> Exprs);
+
+  unsigned getNumExprs() const {
+    return NumExprs;
+  }
+  Expr **getExprs() {
+    return Exprs;
+  }
+  Expr *getExpansion(unsigned Idx) {
+    return Exprs[Idx];
+  }
+  const Expr *getExpansion(unsigned Idx) const {
+    return Exprs[Idx];
+  }
+
+  // Iterators
+  child_range children() {
+    return child_range(reinterpret_cast<Stmt**>(Exprs),
+                       reinterpret_cast<Stmt**>(Exprs) + NumExprs);
+  }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
+  SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == ResolvedUnexpandedPackExprClass;
   }
 };
 } // namespace clang

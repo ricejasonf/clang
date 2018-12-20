@@ -1995,16 +1995,23 @@ void StmtProfiler::VisitTemplateArgument(const TemplateArgument &Arg) {
   }
 }
 
-void StmtProfiler::VisitParametricExpressionIdExpr(const ParametricExpressionIdExpr *S) {
+void StmtProfiler::VisitParametricExpressionIdExpr(
+                                const ParametricExpressionIdExpr *S) {
   VisitExpr(S);
 }
 
 void StmtProfiler::VisitDependentParametricExpressionCallExpr(
-                      const DependentParametricExpressionCallExpr *S) {
+                     const DependentParametricExpressionCallExpr *S) {
   VisitExpr(S);
 }
 
-void StmtProfiler::VisitParametricExpressionCallExpr(const ParametricExpressionCallExpr *S) {
+void StmtProfiler::VisitParametricExpressionCallExpr(
+                              const ParametricExpressionCallExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitResolvedUnexpandedPackExpr(
+                                const ResolvedUnexpandedPackExpr *S) {
   VisitExpr(S);
 }
 

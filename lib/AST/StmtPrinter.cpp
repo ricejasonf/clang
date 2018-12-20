@@ -2803,7 +2803,8 @@ void StmtPrinter::VisitAsTypeExpr(AsTypeExpr *Node) {
   OS << ")";
 }
 
-void StmtPrinter::VisitParametricExpressionIdExpr(ParametricExpressionIdExpr *Node) {
+void StmtPrinter::VisitParametricExpressionIdExpr(
+                                 ParametricExpressionIdExpr *Node) {
   // TODO JASON uhhh do we need to worry about name qualifiers here
   OS << Node->getDefinitionDecl()->getName();
 }
@@ -2813,8 +2814,14 @@ void StmtPrinter::VisitDependentParametricExpressionCallExpr(
   // TODO
 }
 
-void StmtPrinter::VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *Node) {
+void StmtPrinter::VisitParametricExpressionCallExpr(
+                               ParametricExpressionCallExpr *Node) {
   // TODO might have to store the original CallExpr and print that idk
+}
+
+void StmtPrinter::VisitResolvedUnexpandedPackExpr(
+                                 ResolvedUnexpandedPackExpr *Node) {
+  // TODO
 }
 
 //===----------------------------------------------------------------------===//

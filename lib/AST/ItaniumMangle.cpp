@@ -3561,6 +3561,7 @@ recurse:
   case Expr::FixedPointLiteralClass:
   case Expr::ParametricExpressionCallExprClass:
   case Expr::DependentParametricExpressionCallExprClass:
+  case Expr::ResolvedUnexpandedPackExprClass:
   {
     if (!NullOut) {
       // As bad as this diagnostic is, it's better than crashing.
