@@ -1219,7 +1219,16 @@ ExprResult Sema::ActOnCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,
   }
 
   BinaryOperatorKind Opc = ConvertTokenKindToBinaryOpcode(Operator);
-  return BuildCXXFoldExpr(LParenLoc, LHS, Opc, EllipsisLoc, RHS, RParenLoc);
+  ExprResult Result = BuildCXXFoldExpr(LParenLoc, LHS, Opc, EllipsisLoc, RHS,
+                                       RParenLoc);
+
+  // If we can expand it now, do so. This can happen when a parametric
+  // expression returns an expression containing an unexpanded pack.
+  if (Result.isUsable() && 
+      (!LHS || !LHS->isTypeDependent()) && (!RHS || !RHS->isTypeDependent()))
+    return SubstExpr(Result.get(), /*TemplateArgs=*/{});
+
+  return Result;
 }
 
 ExprResult Sema::BuildCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,
