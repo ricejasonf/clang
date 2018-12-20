@@ -6928,6 +6928,9 @@ public:
                                  SmallVectorImpl<Expr *> &Outputs);
   bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                                  SmallVectorImpl<Expr *> &Outputs);
+  bool TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
+                           SmallVectorImpl<ParsedTemplateArgument> &ArgList);
+
 
   //===--------------------------------------------------------------------===//
   // C++ Template Argument Deduction (C++ [temp.deduct])

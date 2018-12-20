@@ -974,6 +974,51 @@ bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                     /*IsCall=*/false, /*TemplateArgs=*/{}, Outputs);
 }
 
+bool Sema::TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
+                            SmallVectorImpl<ParsedTemplateArgument> &ArgList) {
+  switch (Arg.getKind()) {
+    case ParsedTemplateArgument::NonType: {
+      EnterExpressionEvaluationContext ConstantEvaluated(
+        *this, ExpressionEvaluationContext::ConstantEvaluated);
+      PackExpansionExpr *PE = dyn_cast<PackExpansionExpr>(Arg.getAsExpr());
+      assert(PE && "Pack expansion is not a PackExpansionExpr");
+      if (PE->getPattern()->isTypeDependent()) {
+        ArgList.push_back(Arg);
+        return false;
+      }
+      SmallVector<Expr*, 12> OutputExprs;
+      // If it is not type dependent then we can expand it
+      if (SubstExprs(ArrayRef<Expr*>(reinterpret_cast<Expr**>(&PE), 
+                                     reinterpret_cast<Expr**>(&PE) + 1),
+                     /*IsCall=*/false, /*TemplateArgs=*/{}, OutputExprs))
+        return true;
+
+      // Transform the OutputExprs to the template args
+      for (Expr *E : OutputExprs) {
+        ExprResult R = ActOnConstantExpression(ExprResult(E));
+        if (R.isInvalid())
+          return true;
+
+        ArgList.push_back(
+            ParsedTemplateArgument(ParsedTemplateArgument::NonType,
+                                   R.get(), Arg.getLocation()));
+      }
+      return false;
+    }
+
+    case ParsedTemplateArgument::Type: {
+      llvm_unreachable("Not implemented yet");
+      return false;
+    }
+
+    case ParsedTemplateArgument::Template: {
+      llvm_unreachable("Not implemented yet");
+      return false;
+    }
+  } 
+  llvm_unreachable("Template argument kind not handled");
+}
+
 namespace {
 
 // Callback to only accept typo corrections that refer to parameter packs.
