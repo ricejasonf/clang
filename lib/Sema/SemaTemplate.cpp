@@ -826,14 +826,11 @@ static TemplateArgumentLoc translateTemplateArgument(Sema &SemaRef,
   llvm_unreachable("Unhandled parsed template argument");
 }
 
-static bool isPossiblyResolvedPack(const ParsedTemplateArgument &Arg) {
+static bool isResolvedPack(Sema &SemaRef, const ParsedTemplateArgument &Arg) {
   switch (Arg.getKind()) {
   case ParsedTemplateArgument::Type: {
-    QualType T = Arg.getAsType().get();
-    bool IsPackExpansionType = isa<PackExpansionType>(T);
-    bool IsNonDependent = false;
-    if (IsPackExpansionType)
-     IsNonDependent = !cast<PackExpansionType>(T)->getPattern()->isDependentType();
+    QualType T = SemaRef.GetTypeFromParser(Arg.getAsType(),
+                                         /*TypeSourceInfo=*/nullptr);
     return isa<PackExpansionType>(T) &&
       !cast<PackExpansionType>(T)->getPattern()->isDependentType();
   }
@@ -857,7 +854,7 @@ static bool isPossiblyResolvedPack(const ParsedTemplateArgument &Arg) {
 void Sema::translateTemplateArguments(const ASTTemplateArgsPtr &TemplateArgsIn,
                                       TemplateArgumentListInfo &TemplateArgs) {
  for (unsigned I = 0, Last = TemplateArgsIn.size(); I != Last; ++I)
-   if (isPossiblyResolvedPack(TemplateArgsIn[I])) {
+   if (isResolvedPack(*this, TemplateArgsIn[I])) {
      TemplateArgumentLoc Arg = translateTemplateArgument(*this,
                                                          TemplateArgsIn[I]);
      Subst(&Arg, /*NumArgs=*/1, TemplateArgs, MultiLevelTemplateArgumentList{});
