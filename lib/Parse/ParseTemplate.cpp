@@ -1308,17 +1308,8 @@ Parser::ParseTemplateArgumentList(TemplateArgList &TemplateArgs) {
       return true;
     }
 
-    // Expand resolved packs if you got em
-    if (EllipsisLoc.isValid()) {
-      if (Actions.TryExpandResolvedPackExpansion(Arg, TemplateArgs)) {
-        SkipUntil(tok::comma, tok::greater, StopAtSemi | StopBeforeMatch);
-        return true;
-      }
-    }
-    else {
-      // Save this template argument.
-      TemplateArgs.push_back(Arg);
-    }
+    // Save this template argument.
+    TemplateArgs.push_back(Arg);
 
     // If the next token is a comma, consume it and keep reading
     // arguments.

@@ -4798,7 +4798,7 @@ class ParametricExpressionIdExpr : public Expr {
   ParametricExpressionDecl *DefinitionDecl;
   Expr *BaseExpr;
 
-  ParametricExpressionIdExpr(SourceLocation BL, QualType QT, 
+  ParametricExpressionIdExpr(SourceLocation BL, QualType QT,
                              ParametricExpressionDecl *D,
                              Expr* Base = nullptr)
     : Expr(ParametricExpressionIdExprClass, QT, VK_RValue, OK_Ordinary,
@@ -4835,7 +4835,7 @@ public:
 // DependentParametricExpressionCallExpr
 //                                - A call a parametric expression that
 //                                  contains dependent arguments
-//                                
+//
 class DependentParametricExpressionCallExpr : public Expr {
   SourceLocation BeginLoc;
   ParametricExpressionDecl *TheDecl;
@@ -4875,7 +4875,7 @@ public:
     if (BaseExpr)
       return child_range(reinterpret_cast<Stmt**>(&BaseExpr),
                          reinterpret_cast<Stmt**>(&BaseExpr) + NumArgs + 1);
-    return child_range(reinterpret_cast<Stmt**>(CallArgs), 
+    return child_range(reinterpret_cast<Stmt**>(CallArgs),
                        reinterpret_cast<Stmt**>(CallArgs) + NumArgs);
   }
 
@@ -4890,7 +4890,7 @@ public:
 // ParametricExpressionCallExpr - A compound statement with RAII scope that
 //                                evaluates as an expression based on its
 //                                return value
-//                           
+//
 class ParametricExpressionCallExpr : public Expr {
   SourceLocation BeginLoc;
   ParmVarDecl** ParamInfo;
@@ -4970,6 +4970,7 @@ class ResolvedUnexpandedPackExpr : public Expr {
 public:
   static ResolvedUnexpandedPackExpr *Create(ASTContext &C,
                                             SourceLocation BeginLoc,
+                                            QualType T,
                                             ArrayRef<Expr*> Exprs);
 
   unsigned getNumExprs() const {

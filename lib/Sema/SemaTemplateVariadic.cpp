@@ -974,6 +974,7 @@ bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                     /*IsCall=*/false, /*TemplateArgs=*/{}, Outputs);
 }
 
+#if 0
 bool Sema::TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
                             SmallVectorImpl<ParsedTemplateArgument> &ArgList) {
   switch (Arg.getKind()) {
@@ -1007,6 +1008,7 @@ bool Sema::TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
     }
 
     case ParsedTemplateArgument::Type: {
+
       llvm_unreachable("Not implemented yet");
       return false;
     }
@@ -1018,6 +1020,7 @@ bool Sema::TryExpandResolvedPackExpansion(const ParsedTemplateArgument &Arg,
   } 
   llvm_unreachable("Template argument kind not handled");
 }
+#endif
 
 namespace {
 

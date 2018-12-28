@@ -8184,5 +8184,16 @@ ExprResult Sema::BuildResolvedUnexpandedPackExpr(
                  ResultExprs))
     return ExprError();
 
-  return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, ResultExprs);
+  TemplateTypeParmDecl *DummyTemplateParam =
+      TemplateTypeParmDecl::Create(
+          Context, Context.getTranslationUnitDecl(),
+          /*KeyLoc*/ SourceLocation(), /*NameLoc*/ SourceLocation(),
+          /*TemplateDepth*/ 0, /*AutoParameterPosition*/ 0,
+          /*Identifier*/ nullptr, false, /*IsParameterPack*/ true);
+
+  QualType T = Context.getPackExpansionType(
+                      QualType(DummyTemplateParam->getTypeForDecl(), 0),
+                      ResultExprs.size());
+  //QualType T = Context.DependentTy;
+  return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, T, ResultExprs);
 }

@@ -948,7 +948,8 @@ bool TemplateInstantiator::AlreadyTransformed(QualType T) {
   if (T.isNull())
     return true;
 
-  if (T->isInstantiationDependentType() || T->isVariablyModifiedType())
+  if (T->isInstantiationDependentType() || T->isVariablyModifiedType() ||
+      T->containsUnexpandedParameterPack())
     return false;
 
   getSema().MarkDeclarationsReferencedInType(Loc, T);
@@ -1557,8 +1558,11 @@ TemplateInstantiator::TransformResolvedUnexpandedPackExpr(
                      /*IsCall=*/false, NewExprs))
     return ExprError();
       
+  // NOTE: The type is just a superficial PackExpansionType
+  //       that needs no substitution.
   return ResolvedUnexpandedPackExpr::Create(SemaRef.Context,
                                             E->getBeginLoc(),
+                                            E->getType(),
                                             NewExprs);
 }
 

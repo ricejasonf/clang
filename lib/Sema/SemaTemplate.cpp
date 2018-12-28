@@ -826,13 +826,45 @@ static TemplateArgumentLoc translateTemplateArgument(Sema &SemaRef,
   llvm_unreachable("Unhandled parsed template argument");
 }
 
+static bool isPossiblyResolvedPack(const ParsedTemplateArgument &Arg) {
+  switch (Arg.getKind()) {
+  case ParsedTemplateArgument::Type: {
+    QualType T = Arg.getAsType().get();
+    bool IsPackExpansionType = isa<PackExpansionType>(T);
+    bool IsNonDependent = false;
+    if (IsPackExpansionType)
+     IsNonDependent = !cast<PackExpansionType>(T)->getPattern()->isDependentType();
+    return isa<PackExpansionType>(T) &&
+      !cast<PackExpansionType>(T)->getPattern()->isDependentType();
+  }
+
+  case ParsedTemplateArgument::NonType: {
+    Expr *E = static_cast<Expr *>(Arg.getAsExpr());
+    return isa<PackExpansionExpr>(E) &&
+      !cast<PackExpansionExpr>(E)->getPattern()->isTypeDependent();
+  }
+
+  case ParsedTemplateArgument::Template: {
+    return false;
+  }
+  }
+
+  return false;
+}
+
 /// Translates template arguments as provided by the parser
 /// into template arguments used by semantic analysis.
 void Sema::translateTemplateArguments(const ASTTemplateArgsPtr &TemplateArgsIn,
                                       TemplateArgumentListInfo &TemplateArgs) {
  for (unsigned I = 0, Last = TemplateArgsIn.size(); I != Last; ++I)
-   TemplateArgs.addArgument(translateTemplateArgument(*this,
-                                                      TemplateArgsIn[I]));
+   if (isPossiblyResolvedPack(TemplateArgsIn[I])) {
+     TemplateArgumentLoc Arg = translateTemplateArgument(*this,
+                                                         TemplateArgsIn[I]);
+     Subst(&Arg, /*NumArgs=*/1, TemplateArgs, MultiLevelTemplateArgumentList{});
+   } else {
+     TemplateArgs.addArgument(translateTemplateArgument(*this,
+                                                        TemplateArgsIn[I]));
+   }
 }
 
 static void maybeDiagnoseTemplateParameterShadow(Sema &SemaRef, Scope *S,
@@ -6196,7 +6228,8 @@ ExprResult Sema::CheckTemplateArgument(NonTypeTemplateParmDecl *Param,
 
   // If either the parameter has a dependent type or the argument is
   // type-dependent, there's nothing we can check now.
-  if (ParamType->isDependentType() || Arg->isTypeDependent()) {
+  if (ParamType->isDependentType() || Arg->isTypeDependent() ||
+      Arg->containsUnexpandedParameterPack()) {
     // FIXME: Produce a cloned, canonical expression?
     Converted = TemplateArgument(Arg);
     return Arg;

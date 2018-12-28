@@ -1519,12 +1519,9 @@ bool ParametricExpressionCallExpr::hasDependentArgs(ArrayRef<Expr *> Args) {
 
 ResolvedUnexpandedPackExpr *
 ResolvedUnexpandedPackExpr::Create(ASTContext &C, SourceLocation BL,
-                                   ArrayRef<Expr*> Exprs) {
-  // FIXME: Not sure what to specify for a type as it
-  //        is not technically dependent
-  //        (It shouldn't matter what the type is)
+                                   QualType T, ArrayRef<Expr*> Exprs) {
   ResolvedUnexpandedPackExpr *
-  New = new (C) ResolvedUnexpandedPackExpr(BL, C.DependentTy);
+  New = new (C) ResolvedUnexpandedPackExpr(BL, T);
 
   New->NumExprs = Exprs.size();
 
