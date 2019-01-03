@@ -2581,8 +2581,10 @@ Decl *TemplateDeclInstantiator::VisitParametricExpressionDecl(
   // Body
   Stmt* Body;
   if (isa<CompoundStmt>(D->getBody())) {
+    SemaRef.PushFunctionScope();
     StmtResult BodyResult = SemaRef.SubstStmt(D->getBody(),
                                               LocalTemplateArgs);
+    SemaRef.PopFunctionScopeInfo();
     if (BodyResult.isInvalid())
       return nullptr;
     Body = BodyResult.get();

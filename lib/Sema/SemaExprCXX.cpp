@@ -8080,7 +8080,9 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
 
   // Instantiate the body
   if (CompoundStmt::classof(Output)) {
+    PushFunctionScope();
     StmtResult CSResult = SubstStmt(Output, TemplateArgs);
+    PopFunctionScopeInfo();
     if (CSResult.isInvalid())
       return ExprError();
 
