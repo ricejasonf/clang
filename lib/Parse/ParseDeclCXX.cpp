@@ -949,9 +949,7 @@ Parser::ParseParametricExpressionDeclaration(
   }
 #endif
 
-  CXXRecordDecl *ThisContext = New->getThisContext();
-  bool NeedsRAII = ThisContext != nullptr;
-
+  bool NeedsRAII = false;
   Actions.PushFunctionScope();
   ParseScope BodyScope(this, Scope::FnScope | Scope::DeclScope |
                              Scope::CompoundStmtScope);
