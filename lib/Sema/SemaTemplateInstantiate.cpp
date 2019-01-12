@@ -2064,7 +2064,9 @@ Sema::InstantiateClass(SourceLocation PointOfInstantiation,
   // If this is an instantiation of a local class, merge this local
   // instantiation scope with the enclosing scope. Otherwise, every
   // instantiation of a class has its own local instantiation scope.
-  bool MergeWithParentScope = !Instantiation->isDefinedOutsideFunctionOrMethod();
+  bool MergeWithParentScope =
+    !Instantiation->isDefinedOutsideFunctionOrMethod() ||
+    isa<ParametricExpressionDecl>(Pattern->getDeclContext());
   LocalInstantiationScope Scope(*this, MergeWithParentScope);
 
   // Some class state isn't processed immediately but delayed till class

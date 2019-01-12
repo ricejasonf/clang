@@ -968,6 +968,7 @@ Parser::ParseParametricExpressionDeclaration(
 
   // Body
 
+  ++CurTemplateDepthTracker;
   StmtResult CSResult = ParseCompoundStatement();
   Decl *TheDecl = Actions.ActOnFinishParametricExpressionDecl(New,
                                                               NeedsRAII,
