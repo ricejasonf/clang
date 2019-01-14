@@ -2270,9 +2270,9 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
   }
 }
 
-llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
-                                          const ParametricExpressionCallExpr* E,
-                                          AggValueSlot AggSlot) {
+Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
+                                    const ParametricExpressionCallExpr* E,
+                                    AggValueSlot AggSlot) {
   ParametricExpressionCallExprScope PScope(*this);
 
   QualType RetTy = E->getType();
@@ -2286,9 +2286,7 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   LexicalScope Scope(*this, Body->getSourceRange());
   ReturnBlock = getJumpDestInCurrentScope("pe.return");
 
-  if (hasAggregateEvaluationKind(RetTy)) {
-    // This is a naive guess on how we can just
-    // write to the AggSlot from EmitReturnStmt
+  if (!AggSlot.isIgnored()) {
     ReturnValue = AggSlot.getAddress();
   } else {
     ReturnValue = CreateMemTemp(RetTy);
@@ -2304,11 +2302,19 @@ llvm::Value *CodeGenFunction::EmitParametricExpressionCallExpr(
   EmitCompoundStmtWithoutScope(*Body);
   EmitReturnBlock();
 
-  if (hasAggregateEvaluationKind(RetTy)) {
-    // ReturnStmt did the work already
-    return nullptr;
-  } else {
-    return EmitLoadOfScalar(MakeAddrLValue(ReturnValue, RetTy),
-                            E->getBeginLoc());
-  }
+  return ReturnValue;
+}
+
+RValue CodeGenFunction::EmitParametricExpressionCallExpr(
+                                      const ParametricExpressionCallExpr* E,
+                                      AggValueSlot AggSlot) {
+  Address ResultAddr = EmitParametricExpressionCallExprInternal(E, AggSlot);
+  return convertTempToRValue(ResultAddr, E->getType(), E->getBeginLoc());
+}
+
+LValue CodeGenFunction::EmitParametricExpressionCallExprLValue(
+                                      const ParametricExpressionCallExpr* E) {
+  Address ResultAddr = EmitParametricExpressionCallExprInternal(E,
+                                                    AggValueSlot::ignored());
+  return MakeAddrLValue(ResultAddr, E->getType());
 }

@@ -1357,6 +1357,9 @@ LValue CodeGenFunction::EmitLValue(const Expr *E) {
     return EmitCoawaitLValue(cast<CoawaitExpr>(E));
   case Expr::CoyieldExprClass:
     return EmitCoyieldLValue(cast<CoyieldExpr>(E));
+  case Expr::ParametricExpressionCallExprClass:
+    return EmitParametricExpressionCallExprLValue(
+                cast<ParametricExpressionCallExpr>(E));
   }
 }
 

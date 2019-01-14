@@ -7921,7 +7921,7 @@ class ParametricExpressionReturnStmtVisitor
 
 public:
   ParametricExpressionReturnStmtVisitor(Sema &S)
-    : SemaRef(S), ResultType(S.Context.DependentTy) {}
+    : SemaRef(S), ResultType() {}
 
   QualType getResultType() {
     return ResultType;
@@ -7948,7 +7948,9 @@ public:
 
     QualType CurrentResultType{};
     if (RE) {
-      CurrentResultType = RS->getRetValue()->getType();
+      CurrentResultType = SemaRef.BuildDecltypeType(RS->getRetValue(),
+                                     RS->getRetValue()->getBeginLoc(),
+                                     /*AsUnevaluated=*/false);
     } else {
       CurrentResultType = SemaRef.Context.VoidTy;
     }
@@ -8113,13 +8115,21 @@ ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
   if (R.hasError())
     return ExprError();
 
-  VK = R.getResultType()->isReferenceType() ? VK_LValue : VK_RValue;
-  T = R.getResultType().getNonReferenceType();
+  T = R.getResultType();
+
   // Default to returning `void`
-  // TODO consider QualType() as the placeholder for default
-  if (T.getTypePtrOrNull() == Context.DependentTy->getTypePtr())
+  if (T.isNull())
     T = Context.VoidTy;
 
+  if (T->isLValueReferenceType()) {
+    VK = VK_LValue;
+  } else if (T->isRValueReferenceType()) {
+    VK = T->isFunctionType() ? VK_LValue : VK_XValue;
+  } else {
+    VK =  VK_RValue;
+  }
+
+  T = T.getNonReferenceType();
   return ParametricExpressionCallExpr::Create(Context, BeginLoc,
                                               Body, T, VK, Params);
 }
