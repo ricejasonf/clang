@@ -12748,6 +12748,10 @@ Sema::CreateOverloadedArraySubscriptExpr(SourceLocation LLoc,
           return ExprError();
 
         return MaybeBindToTemporary(TheCall);
+      } else if (ParametricExpressionDecl *PD =
+          dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+        ArrayRef<Expr *> ArgsArray(Args, 2);
+        return ActOnParametricExpressionCallExpr(PD, nullptr, ArgsArray, LLoc);
       } else {
         // We matched a built-in operator. Convert the arguments, then
         // break out so that we will build the appropriate built-in
@@ -13458,6 +13462,14 @@ Sema::BuildOverloadedArrowExpr(Scope *S, Expr *Base, SourceLocation OpLoc,
   }
 
   CheckMemberOperatorAccess(OpLoc, Base, nullptr, Best->FoundDecl);
+
+  if (Best->Function == nullptr) {
+    if (ParametricExpressionDecl *PD =
+        dyn_cast_or_null<ParametricExpressionDecl>(Best->FoundDecl.getDecl())) {
+      ArrayRef<Expr*> Args = {&Base, &Base + 1};
+      return ActOnParametricExpressionCallExpr(PD, nullptr, Args, OpLoc);
+    }
+  }
 
   // Convert the object parameter.
   CXXMethodDecl *Method = cast<CXXMethodDecl>(Best->Function);
