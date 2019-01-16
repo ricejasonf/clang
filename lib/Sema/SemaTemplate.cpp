@@ -832,19 +832,15 @@ static bool isResolvedPack(Sema &SemaRef, const ParsedTemplateArgument &Arg) {
     QualType T = SemaRef.GetTypeFromParser(Arg.getAsType(),
                                          /*TypeSourceInfo=*/nullptr);
     return isa<PackExpansionType>(T) &&
-      !cast<PackExpansionType>(T)->getPattern()->isDependentType() &&
-      !cast<PackExpansionType>(T)->getPattern()
-        ->isInstantiationDependentType();
-
+      SemaRef.containsAllResolvedPacks(
+          cast<PackExpansionType>(T)->getPattern());
   }
 
   case ParsedTemplateArgument::NonType: {
     Expr *E = static_cast<Expr *>(Arg.getAsExpr());
     return isa<PackExpansionExpr>(E) &&
-      !cast<PackExpansionExpr>(E)->getPattern()->isTypeDependent() &&
-      !cast<PackExpansionExpr>(E)->getPattern()->isValueDependent() &&
-      !cast<PackExpansionExpr>(E)->getPattern()->isInstantiationDependent();
-
+      SemaRef.containsAllResolvedPacks(
+          cast<PackExpansionExpr>(E)->getPattern());
   }
 
   case ParsedTemplateArgument::Template: {

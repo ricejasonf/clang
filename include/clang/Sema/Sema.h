@@ -6923,6 +6923,11 @@ public:
   /// avoid actually expanding the pack where possible.
   Optional<unsigned> getFullyPackExpandedSize(TemplateArgument Arg);
 
+  // Returns true if Pattern contains unexpanded packs
+  // that are all ResolvedUnexpandedPackExpr
+  bool containsAllResolvedPacks(Expr* Pattern);
+  bool containsAllResolvedPacks(QualType Pattern);
+
   bool TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                         SmallVectorImpl<SourceLocation> &CommaLocs,
                                  SmallVectorImpl<Expr *> &Outputs);

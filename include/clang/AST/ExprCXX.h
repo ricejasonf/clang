@@ -4962,8 +4962,8 @@ class ResolvedUnexpandedPackExpr : public Expr {
 
   ResolvedUnexpandedPackExpr(SourceLocation BL, QualType QT)
       : Expr(ResolvedUnexpandedPackExprClass, QT, VK_RValue,
-             OK_Ordinary, /*TypeDependent=*/false,
-             /*ValueDependent=*/false, /*InstantiationDependent=*/false,
+             OK_Ordinary, /*TypeDependent=*/true,
+             /*ValueDependent=*/true, /*InstantiationDependent=*/true,
              /*ContainsUnexpandedParameterPack=*/true),
         BeginLoc(BL) {}
 

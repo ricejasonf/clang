@@ -943,6 +943,48 @@ bool Sema::containsUnexpandedParameterPacks(Declarator &D) {
   return false;
 }
 
+bool Sema::containsAllResolvedPacks(Expr *Pattern) {
+  // This might incur a performance hit, but it is
+  // very low impact on the code base compared to
+  // other solutions.
+  // TODO benchmark against vanilla clang with
+  //      Boost.Hana's tests or something
+  SmallVector<UnexpandedParameterPack, 4> Unexpanded;
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  if (Unexpanded.empty())
+    return false;
+
+  for (auto& I : Unexpanded) {
+    if (!I.first.is<ResolvedUnexpandedPackExpr*>()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+bool Sema::containsAllResolvedPacks(QualType Pattern) {
+  // This might incur a performance hit, but it is
+  // very low impact on the code base compared to
+  // other solutions.
+  // TODO benchmark against vanilla clang with
+  //      Boost.Hana's tests or something
+  SmallVector<UnexpandedParameterPack, 4> Unexpanded;
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  if (Unexpanded.empty())
+    return false;
+
+  for (auto& I : Unexpanded) {
+    if (!I.first.is<ResolvedUnexpandedPackExpr*>()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
                             SmallVectorImpl<SourceLocation> &CommaLocs,
                                     SmallVectorImpl<Expr *> &Outputs) {
@@ -963,10 +1005,7 @@ bool Sema::TryExpandResolvedPackExpansion(PackExpansionExpr *Expansion,
   if (!Expansion)
     return true;
 
-  Expr *Pattern = Expansion->getPattern();
-  if (Pattern->isTypeDependent() ||
-      Pattern->isValueDependent() ||
-      Pattern->isInstantiationDependent()) {
+  if (!containsAllResolvedPacks(Expansion->getPattern())) {
     Outputs.push_back(Expansion);
     return false;
   }
@@ -1233,7 +1272,8 @@ ExprResult Sema::ActOnCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,
   // If we can expand it now, do so. This can happen when a parametric
   // expression returns an expression containing an unexpanded pack.
   if (Result.isUsable() && 
-      (!LHS || !LHS->isTypeDependent()) && (!RHS || !RHS->isTypeDependent()))
+      (!LHS || containsAllResolvedPacks(LHS)) &&
+      (!RHS || containsAllResolvedPacks(RHS)))
     return SubstExpr(Result.get(), /*TemplateArgs=*/{});
 
   return Result;
