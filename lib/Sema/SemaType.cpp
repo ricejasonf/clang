@@ -5075,16 +5075,11 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       D.setInvalidType(true);
     }
 
-    // If it is constexpr we just use the auto type
-    // otherwise we use DependentTy and replace it
-    // later
-    if (!D.getDeclSpec().isConstexprSpecified()) {
-      // Make the type "dependent"
-      unsigned IsConst = T.isConstQualified();
-      T = S.Context.DependentTy;
-      if (IsConst)
-        T.addConst();
-    }
+    // Make the type "dependent"
+    unsigned IsConst = T.isConstQualified();
+    T = S.Context.DependentTy;
+    if (IsConst)
+      T.addConst();
   }
 
   assert(!T.isNull() && "T must not be null at the end of this function");

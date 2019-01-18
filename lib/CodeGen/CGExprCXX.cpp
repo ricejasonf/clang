@@ -2293,8 +2293,7 @@ Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
   }
 
   for (ParmVarDecl* PD : E->parameters()) {
-    // FIXME: Cull `using` params during instantiation.
-    if (!PD->isUsingSpecified()) {
+    if (!PD->isUsingSpecified() && !(PD->isConstexpr() && !PD->getDeclName())) {
       EmitAutoVarDecl(*PD);
     }
   }

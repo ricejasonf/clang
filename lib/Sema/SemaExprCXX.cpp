@@ -8142,11 +8142,15 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
   if (!ArgExpr) {
     ArgTy = Old->getType();
   } else if (Old->isConstexpr()) {
+    ArgTy = Context.getAutoType(QualType(), AutoTypeKeyword::Auto,
+                              /*IsDependent=*/false);
+    TypeLocBuilder TLB;
+    TLB.pushTypeSpec(ArgTy).setNameLoc(Old->getBeginLoc());
+    TypeSourceInfo *TSI = TLB.getTypeSourceInfo(Context, ArgTy);
+
     ArgTy = deduceVarTypeFromInitializer(
-        Old, Old->getDeclName(), Old->getType(), Old->getTypeSourceInfo(),
-        Old->getSourceRange(), /*DirectInit=*/false, ArgExpr);
-    if (ArgTy.isNull())
-      return nullptr;
+      Old, Old->getDeclName(), ArgTy, TSI,
+      Old->getSourceRange(), /*DirectInit=*/false, ArgExpr);
   } else if (Old->isUsingSpecified()) {
     // using params have the same type as the argument
     ArgTy = ArgExpr->getType();
@@ -8179,6 +8183,9 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
     if (InitExprResult.isInvalid())
       return nullptr;
     AddInitializerToDecl(New, InitExprResult.get(), /*DirectInit=*/ false);
+    assert((ArgExpr->getType()->isDependentType() ||
+           !New->getType()->isDependentType()) &&
+          "Param with non-dependent init should not be dependent");
   } else {
     // Using Params can contain things like packs and overloaded function ids
     New->setUsingSpecified(true);
