@@ -8141,9 +8141,14 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
   QualType ArgTy;
   if (!ArgExpr) {
     ArgTy = Old->getType();
-  } else if (Old->isConstexpr() || Old->isUsingSpecified()) {
-    // constexpr/using params have the same type as the argument
-    // The type could be an abstract type for `using` params
+  } else if (Old->isConstexpr()) {
+    ArgTy = deduceVarTypeFromInitializer(
+        Old, Old->getDeclName(), Old->getType(), Old->getTypeSourceInfo(),
+        Old->getSourceRange(), /*DirectInit=*/false, ArgExpr);
+    if (ArgTy.isNull())
+      return nullptr;
+  } else if (Old->isUsingSpecified()) {
+    // using params have the same type as the argument
     ArgTy = ArgExpr->getType();
   } else if (ArgExpr->getType()->isPlaceholderType()) {
     CheckPlaceholderExpr(ArgExpr);

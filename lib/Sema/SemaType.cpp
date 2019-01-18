@@ -5062,6 +5062,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
       D.setInvalidType(true);
     }
+    // this is a hack
     if (T->isReferenceType() || T->isPointerType()) {
       S.Diag(D.getBeginLoc(), diag::err_parametric_expression_constraint_has_qualifiers);
       D.setInvalidType(true);
@@ -5074,11 +5075,16 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
       D.setInvalidType(true);
     }
 
-    // Make the type "dependent"
-    unsigned IsConst = T.isConstQualified();
-    T = S.Context.DependentTy;
-    if (IsConst)
-      T.addConst();
+    // If it is constexpr we just use the auto type
+    // otherwise we use DependentTy and replace it
+    // later
+    if (!D.getDeclSpec().isConstexprSpecified()) {
+      // Make the type "dependent"
+      unsigned IsConst = T.isConstQualified();
+      T = S.Context.DependentTy;
+      if (IsConst)
+        T.addConst();
+    }
   }
 
   assert(!T.isNull() && "T must not be null at the end of this function");
