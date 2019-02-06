@@ -1455,6 +1455,27 @@ QualType
 TemplateInstantiator::TransformTemplateTypeParmType(TypeLocBuilder &TLB,
                                                 TemplateTypeParmTypeLoc TL) {
   const TemplateTypeParmType *T = TL.getTypePtr();
+
+  if (SemaRef.ExpandingExprAlias && SemaRef.getCurGenericLambda()) {
+    // ExpandingExprAlias within a lambda
+    // The type and depth were already transformed
+    // in the param decl
+    TemplateTypeParmDecl *NewTTPDecl = cast_or_null<TemplateTypeParmDecl>(
+                                  TransformDecl(TL.getNameLoc(), T->getDecl()));
+    if (NewTTPDecl) {
+      QualType Result = QualType(NewTTPDecl->getTypeForDecl(), 0);
+      TemplateTypeParmTypeLoc NewTL = TLB.push<TemplateTypeParmTypeLoc>(Result);
+      NewTL.setNameLoc(TL.getNameLoc());
+      return Result;
+    }
+
+    // Not sure if it ever gets here
+    TemplateTypeParmTypeLoc NewTL
+      = TLB.push<TemplateTypeParmTypeLoc>(TL.getType());
+    NewTL.setNameLoc(TL.getNameLoc());
+    return TL.getType();
+  }
+
   if (T->getDepth() < TemplateArgs.getNumLevels()) {
     // Replace the template type parameter with its corresponding
     // template argument.
