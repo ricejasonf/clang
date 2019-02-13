@@ -4797,10 +4797,12 @@ class ParametricExpressionIdExpr : public Expr {
   SourceLocation BeginLoc;
   ParametricExpressionDecl *DefinitionDecl;
   Expr *BaseExpr;
+  bool IsPackOpAnnotated : 1;
 
   ParametricExpressionIdExpr(SourceLocation BL, QualType QT,
                              ParametricExpressionDecl *D,
-                             Expr* Base = nullptr)
+                             Expr* Base = nullptr,
+                             IsPackOpAnnotated = false)
     : Expr(ParametricExpressionIdExprClass, QT, VK_RValue, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL),
@@ -4819,10 +4821,12 @@ public:
 
   Expr *getBaseExpr() { return BaseExpr; };
 
+  void setIsPackOpAnnotated(bool Value = true) {
+    IsPackOpAnnotated = Value;
+  }  
+
   // Iterators
-  child_range children() {
-    return child_range(child_iterator(), child_iterator());
-  }
+  child_range children() { return child_range(&BaseExpr, &BaseExpr + 1); }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }
   SourceLocation getEndLoc() const LLVM_READONLY { return BeginLoc; }
@@ -4999,6 +5003,51 @@ public:
     return T->getStmtClass() == ResolvedUnexpandedPackExprClass;
   }
 };
+
+// DependentPackOpExpr - An dependent expression with a postfix tilde that
+//                       indicates the expression results in a pack.
+//
+//                       All of these will resolve to a transparent parametric
+//                       expression call which will transform to a
+//                       ResolvedPackExpr
+//
+//                       This can be via a named parametric expression call or
+//                       a member operator `operator~~`
+//                       e.g. foo~()
+//                            obj~
+//
+class DependentPackOpExpr : public Expr {
+  // SubExpr - LHS which may be a parametric expression id or
+  //           an object implementing `operator~~` (postfix tilde)
+  Expr *SubExpr;
+  SourceLocation TildeLoc;
+
+  DependentPackOpExpr(Expr *E, SourceLocation TL)
+    : Expr(DependnetPackOpExprClass, E->getType(), E->getValueKind(), OK_Ordinary,
+           E->isTypeDependent(), E->isValueDependent(),
+           E->isInstantiationDependent(),
+           /*ContainsExpandedParameterPack=*/true),
+      SubExpr(E),
+      TildeLoc(TL) {}
+
+public:
+  static DependentPackOpExpr *Create(ASTContext* C, SubExpr *S,
+                                     SourceLocation TLoc);
+
+  SourceLocation *getSubExpr() { return SubExpr; }
+  SourceLocation getTildeLoc() const { return TildeLoc; }
+    
+  // Iterators
+  child_range children() { return child_range(&SubExpr, &SubExpr + 1); }
+
+  SourceLocation getBeginLoc() const LLVM_READONLY { return E->getBeginLoc(); }
+  SourceLocation getEndLoc() const LLVM_READONLY { return E->getEndLoc(); }
+
+  static bool classof(const Stmt *T) {
+    return T->getStmtClass() == DependentPackOpExprClass;
+  }
+};
+
 } // namespace clang
 
 #endif // LLVM_CLANG_AST_EXPRCXX_H

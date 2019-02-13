@@ -2918,10 +2918,11 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
                             DeclarationName DN,
                             SourceLocation StartL,
                             unsigned TemplateDepth,
-                            bool IsStatic) {
+                            bool IsStatic,
+                            bool IsPackOp) {
   ParametricExpressionDecl *New =
       new (C, DC) ParametricExpressionDecl(DC, DN, StartL, TemplateDepth,
-                                           IsStatic);
+                                           IsStatic, IsPackOp);
   if (DN.getNameKind() == DeclarationName::CXXOperatorName &&
         !DC->isRecord())
     New->setNonMemberOperator();
@@ -2936,7 +2937,8 @@ ParametricExpressionDecl *ParametricExpressionDecl::Create(
       new (C, DC) ParametricExpressionDecl(DC, Old->getDeclName(),
                                            Old->getBeginLoc(),
                                            Old->getTemplateDepth(),
-                                           Old->isStatic());
+                                           Old->isStatic(),
+                                           Old->isPackOp());
   New->setAccess(Old->getAccess());
   if (Old->getDeclName().getNameKind() == DeclarationName::CXXOperatorName &&
         !DC->isRecord())

@@ -8221,3 +8221,31 @@ ExprResult Sema::BuildResolvedUnexpandedPackExpr(
   //QualType T = Context.DependentTy;
   return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, T, ResultExprs);
 }
+
+ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
+                                 bool HasTrailingLParen) {
+  if (LHS.containsUnexpandedParameterPack()) {
+    Diag(TildeLoc, diag::err_pack_op_on_pack);
+    // FIXME Consider noting the location of the pack
+    return ExprError();
+  }
+
+  if (auto *Id = dyn_cast<ParametricExpressionIdExpr>(SubExpr)) {
+    Id->setIsPackOpAnnotated();
+    // Must be a part of call
+    if (HasTrailingLParen) {
+      Diag(TildeLoc,
+           diag::err_parametric_expression_postfix_tilde_not_call);
+      return ExprError();
+    }
+
+    return Id;
+  } 
+
+  if (SubExpr->isDependentType()) {
+    return DependentPackOpExpr::Create(Context, SubExpr, TildeLoc);
+  }
+
+  // The object must have a member `operator~~`.
+  // TODO Find it and call it
+}

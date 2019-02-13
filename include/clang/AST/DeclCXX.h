@@ -3954,22 +3954,24 @@ class ParametricExpressionDecl : public NamedDecl,
   unsigned NumParams = 0;
   unsigned TemplateDepth;
   bool IsStatic : 1;
+  bool IsPackOp : 1;
 
   ParametricExpressionDecl(DeclContext *DC, DeclarationName DN,
-                           SourceLocation StartL,
-                           unsigned TPDepth,
-                           bool IsStatic)
+                           SourceLocation StartL, unsigned TPDepth,
+                           bool IsStatic, bool IsPackOp)
     : NamedDecl(ParametricExpression, DC, StartL, DN)
     , DeclContext(ParametricExpression)
     , TemplateDepth(TPDepth)
-    , IsStatic(IsStatic) {}
+    , IsStatic(IsStatic)
+    , IsPackOp(IsPackOp) {}
 
 public:
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           DeclarationName DN,
                                           SourceLocation StartL,
                                           unsigned TemplateDepth,
-                                          bool IsStatic = false);
+                                          bool IsStatic = false,
+                                          bool IsPackOp = false);
 
   static ParametricExpressionDecl *Create(ASTContext &C, DeclContext *DC,
                                           ParametricExpressionDecl* Old);
@@ -3990,6 +3992,10 @@ public:
 
   bool isStatic() const {
     return IsStatic;
+  }
+
+  bool isPackOp() const {
+    return IsPackOp;
   }
 
   // Returns parent class decl if this

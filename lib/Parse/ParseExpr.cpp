@@ -1803,6 +1803,13 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
       }
       ConsumeToken();
       break;
+    case tok::tilde: // postfix-expression '~'
+      if (!LHS.isInvalid()) {
+        LHS = Actions.ActOnPackOpExpr(Tok.getLocation(), LHS,
+                                      Tok.is(tok_l_paren));
+      }
+      ConsumeToken();
+      break;
     }
   }
 }

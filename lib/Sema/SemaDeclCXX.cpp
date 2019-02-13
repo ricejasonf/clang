@@ -10536,7 +10536,7 @@ Decl *Sema::ActOnAliasDeclaration(Scope *S, AccessSpecifier AS,
 ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
                           Scope *S, Scope *BodyScope, AccessSpecifier AS,
                           SourceLocation BeginLoc, unsigned TemplateDepth,
-                          Declarator &D) {
+                          Declarator &D, bool IsPackOp) {
   DeclarationNameInfo NameInfo = GetNameForDeclarator(D);
   LookupResult Previous(*this, NameInfo, LookupOrdinaryName,
                         NotForRedeclaration);
@@ -10566,9 +10566,8 @@ ParametricExpressionDecl *Sema::ActOnParametricExpressionDecl(
   ParametricExpressionDecl *
   New = ParametricExpressionDecl::Create(Context, CurContext,
                                          NameInfo.getName(),
-                                         BeginLoc,
-                                         TemplateDepth,
-                                         IsStatic);
+                                         BeginLoc, TemplateDepth,
+                                         IsStatic, IsPackOp);
   assert(New && "ParametricExpressionDecl::Create failed??");
   New->setAccess(AS);
   PushOnScopeChains(New, S);

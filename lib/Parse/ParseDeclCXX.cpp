@@ -887,6 +887,12 @@ Parser::ParseParametricExpressionDeclaration(
     return nullptr;
   }
 
+  // Consume optional ~ (tilde) for
+  // specifying a pack operation (returning a pack)
+  // consume optional kw_static specifier for class members
+  SourceLocation TildeLoc;
+  bool IsPackOp = TryConsumeToken(tok::kw_tilde, TildeLoc);
+
   Scope* S = getCurScope();
   if (ExpectAndConsume(tok::l_paren)) {
     return nullptr;
@@ -927,7 +933,8 @@ Parser::ParseParametricExpressionDeclaration(
   ParametricExpressionDecl *New = Actions.ActOnParametricExpressionDecl(
                                                S, getCurScope(), AS,
                                                BeginLoc,
-                                               TemplateParameterDepth, D);
+                                               TemplateParameterDepth, D,
+                                               IsPackOp);
   if (!New)
     return nullptr;
 
@@ -2691,6 +2698,7 @@ Parser::ParseCXXClassMemberDeclaration(AccessSpecifier AS,
     ProhibitAttributes(attrs);
 
     if (GetLookAheadToken(1).is(tok::kw_operator) ||
+        GetLookAheadToken(2).is(tok::tilde) ||
         GetLookAheadToken(2).is(tok::l_paren))
       return ParseParametricExpressionDeclaration(
           DeclaratorContext::MemberContext, AS);
