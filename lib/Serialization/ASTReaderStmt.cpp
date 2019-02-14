@@ -726,6 +726,11 @@ void ASTStmtReader::VisitResolvedUnexpandedPackExpr(
   llvm_unreachable("Cannot read ResolvedUnexpandedPackExpr nodes");
 }
 
+void ASTStmtReader::VisitDependentPackOpExpr(
+                                           DependentPackOpExpr *S) {
+  llvm_unreachable("Cannot read DependentPackOpExpr nodes");
+}
+
 void ASTStmtReader::VisitObjCIsaExpr(ObjCIsaExpr *E) {
   VisitExpr(E);
   E->setBase(Record.readSubExpr());

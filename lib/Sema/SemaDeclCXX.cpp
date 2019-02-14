@@ -10657,6 +10657,21 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
     Body = CS;
   }
 
+  if (NeedsRAII && New->isPackOp()) {
+    // pack op must be a "transparent" transformation
+    Diag(New->getBeginLoc(),
+         diag::err_parametric_expression_pack_op_transparent);
+    return ExprError();
+  }
+
+  if (!NeedsRAII && !New->isPackOp() &&
+    cast<Expr>(Body)->containsUnexpandedParameterPack()) {
+    // may not return pack unless specified in declarator
+    DiagnoseUnexpandedParameterPacks(Body->getBeginLoc(),
+                                     UPPC_Expression);
+    return ExprError();
+  }
+
   // Body isn't necessarily a compound statement so we will see
   // how that flies since this is a member of FunctionDecl
   New->setBody(Body);

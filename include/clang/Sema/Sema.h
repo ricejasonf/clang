@@ -6657,7 +6657,10 @@ public:
     UPPC_Lambda,
 
     /// Block expression,
-    UPPC_Block
+    UPPC_Block,
+
+    /// Unary pack expression
+    UPP_PackOp
   };
 
   /// Diagnose unexpanded parameter packs.

@@ -9891,6 +9891,7 @@ TreeTransform<Derived>::TransformCXXOperatorCallExpr(CXXOperatorCallExpr *E) {
   case OO_Conditional:
     llvm_unreachable("conditional operator is not actually overloadable");
 
+  case OO_PostfixTilde:
   case OO_None:
   case NUM_OVERLOADED_OPERATORS:
     llvm_unreachable("not an overloaded operator?");
@@ -12953,14 +12954,18 @@ template<typename Derived>
 ExprResult
 TreeTransform<Derived>::TransformDependentPackOpExpr(
     DependentPackOpExpr *E) {
-  Expr *SubExpr = getDerived().TransformExpr(E->getSubExpr());
+  ExprResult Result = getDerived().TransformExpr(E->getSubExpr());
+
+  if (Result.isInvalid()) {
+    return ExprError();
+  }
 
   if (!getDerived().AlwaysRebuild() &&
-      SubExpr == E->getSubExpr()) {
+      Result.get() == E->getSubExpr()) {
     return E;
   }
 
-  return SemaRef.ActOnPackOpExpr(E->getTildeLoc(), SubExpr,
+  return SemaRef.ActOnPackOpExpr(E->getTildeLoc(), Result.get(),
                                  E->hasTrailingLParen());
 }
 

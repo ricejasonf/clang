@@ -906,7 +906,7 @@ Parser::ParseParametricExpressionDeclaration(
   } else {
     // The identifier is followed optionally by a tilde
     // to denote it must return a pack
-    IsPackOp = TryConsumeToken(tok::kw_tilde);
+    IsPackOp = TryConsumeToken(tok::tilde);
   }
 
   Scope* S = getCurScope();

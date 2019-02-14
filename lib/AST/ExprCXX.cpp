@@ -1538,9 +1538,10 @@ ResolvedUnexpandedPackExpr::Create(ASTContext &C, SourceLocation BL,
 
 DependentPackOpExpr *
 DependentPackOpExpr::Create(ASTContext &C, Expr* SubExpr,
-                            SourceLocation TLoc) {
-  assert(!SubExpr.containsUnexpandedParameterPack() &&
-    "Unexpanded packs are not allowed as the LHS of a pack op");
-  return new (C) DependentPackOpExpr(SubExpr, TLoc);
+                            SourceLocation TLoc,
+                            bool HasTrailingLParen) {
+  assert(!SubExpr->containsUnexpandedParameterPack() &&
+    "Unexpanded packs are not allowed in the LHS of a pack op");
+  return new (C) DependentPackOpExpr(SubExpr, TLoc, HasTrailingLParen);
 }
                                                     

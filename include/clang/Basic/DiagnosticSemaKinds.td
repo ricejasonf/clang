@@ -4469,7 +4469,7 @@ def err_unexpanded_parameter_pack : Error<
   "size|static assertion|fixed underlying type|enumerator value|"
   "using declaration|friend declaration|qualifier|initializer|default argument|"
   "non-type template parameter type|exception type|partial specialization|"
-  "__if_exists name|__if_not_exists name|lambda|block}0 contains"
+  "__if_exists name|__if_not_exists name|lambda|block|unary pack expression}0 contains"
   "%plural{0: an|:}1 unexpanded parameter pack"
   "%plural{0:|1: %2|2:s %2 and %3|:s %2, %3, ...}1">;
 
@@ -9463,14 +9463,14 @@ def err_std_compare_type_not_supported : Error<
    "the type is not trivially copyable|"
    "the type does not have the expected form}1">;
 
-// pack operation via postfix tilde
-def err_pack_op_on_pack: Error<
-  "Pack operation not allowed on parameter pack">;
+// unary pack operation via postfix tilde
 def err_parametric_expression_postfix_tilde_not_call: Error<
   "A postfix tilde on a parametric expression name must be "
   "part of a call">;
 def err_parametric_expression_not_pack_op: Error<
   "Parametric expression called with postfix tilde does not return a pack">;
 def err_parametric_expression_is_pack_op: Error<
-  "Parametric expression returning pack called without postfix tilde";
+  "Parametric expression returning pack called without postfix tilde">;
+def err_parametric_expression_pack_op_transparent: Error<
+  "Parametric expression returning pack must not require scope"
 } // end of sema component.

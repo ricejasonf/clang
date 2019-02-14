@@ -1282,6 +1282,7 @@ static Stmt::StmtClass DecodeOperatorCall(const CXXOperatorCallExpr *S,
   case OO_Arrow:
   case OO_Call:
   case OO_Conditional:
+  case OO_PostfixTilde:
   case NUM_OVERLOADED_OPERATORS:
     llvm_unreachable("Invalid operator call kind");
 
@@ -2012,6 +2013,11 @@ void StmtProfiler::VisitParametricExpressionCallExpr(
 
 void StmtProfiler::VisitResolvedUnexpandedPackExpr(
                                 const ResolvedUnexpandedPackExpr *S) {
+  VisitExpr(S);
+}
+
+void StmtProfiler::VisitDependentPackOpExpr(
+                                       const DependentPackOpExpr *S) {
   VisitExpr(S);
 }
 

@@ -1746,8 +1746,14 @@ void ASTStmtWriter::VisitDependentParametricExpressionCallExpr(
 
 void ASTStmtWriter::VisitResolvedUnexpandedPackExpr(
                                     ResolvedUnexpandedPackExpr *S) {
-  llvm_unreachable("Cannot read ResolvedUnexpandedPackExpr nodes");
+  llvm_unreachable("Cannot write ResolvedUnexpandedPackExpr nodes");
 }
+
+void ASTStmtWriter::VisitDependentPackOpExpr(
+                                           DependentPackOpExpr *S) {
+  llvm_unreachable("Cannot write DependentPackOpExpr nodes");
+}
+
 
 //===----------------------------------------------------------------------===//
 // CUDA Expressions and Statements.

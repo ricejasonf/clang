@@ -409,8 +409,6 @@ UNARY_OPERATION(Imag, "__imag")
 UNARY_OPERATION(Extension, "__extension__")
 // [C++ Coroutines] co_await operator
 UNARY_OPERATION(Coawait, "co_await")
-// [Parametric Expression] postfix tilde operator
-UNARY_OPERATION(PostTilde, "~~");
 
 #undef CAST_OPERATION
 #undef BINARY_OPERATION

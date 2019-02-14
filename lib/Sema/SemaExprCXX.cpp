@@ -8023,10 +8023,10 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                                         CallArgExprs,
                                                         ReturnsPack);
     if (ReturnsPack && Dep.isUsable() &&
-        Dep.get().containsUnexpandedParameterPack()) {
+        Dep.get()->containsUnexpandedParameterPack()) {
       // Pack op may not have operand containing unexpanded pack
-      Diag(Loc, err::pack_op_on_pack);
-      // TODO note the location of the offending pack
+      DiagnoseUnexpandedParameterPacks(Body->getBeginLoc(),
+                                       UPPC_PackOp);
       return ExprError();
     }
 
@@ -8248,9 +8248,11 @@ ExprResult Sema::BuildResolvedUnexpandedPackExpr(
 
 ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
                                  bool HasTrailingLParen) {
-  if (LHS.containsUnexpandedParameterPack()) {
-    Diag(TildeLoc, diag::err_pack_op_on_pack);
-    // FIXME Consider noting the location of the pack
+  // TODO check CXXScopeSpec
+
+  if (SubExpr->containsUnexpandedParameterPack()) {
+    DiagnoseUnexpandedParameterPacks(TildeLoc,
+                                     UPPC_PackOp);
     return ExprError();
   }
 
@@ -8266,14 +8268,15 @@ ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
     return Id;
   } 
 
-  if (SubExpr->isDependentType()) {
-    return DependentPackOpExpr::Create(Context, SubExpr, TildeLoc);
+  if (SubExpr->isTypeDependent()) {
+    return DependentPackOpExpr::Create(Context, SubExpr, TildeLoc,
+                                       HasTrailingLParen);
   }
 
   CXXRecordDecl *Record = SubExpr->getType()->getAsCXXRecordDecl();
   if (!Record) {
     Diag(TildeLoc, diag::err_typecheck_unary_expr)
-      << Subexpr->getType();
+      << SubExpr->getType();
     return ExprError();
   }
 
@@ -8291,7 +8294,5 @@ ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
     return ExprError();
   }
 
-  ArrayRef<Expr *> ArgsArray(SubExpr, 1);
-  return ActOnParametricExpressionCallExpr(D, /*BaseExpr=*/nullptr
-                                           ArgsArray, TildeLoc);
+  return ActOnParametricExpressionCallExpr(D, SubExpr, {}, TildeLoc);
 }
