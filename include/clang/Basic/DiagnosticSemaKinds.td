@@ -9469,4 +9469,8 @@ def err_pack_op_on_pack: Error<
 def err_parametric_expression_postfix_tilde_not_call: Error<
   "A postfix tilde on a parametric expression name must be "
   "part of a call">;
+def err_parametric_expression_not_pack_op: Error<
+  "Parametric expression called with postfix tilde does not return a pack">;
+def err_parametric_expression_is_pack_op: Error<
+  "Parametric expression returning pack called without postfix tilde";
 } // end of sema component.

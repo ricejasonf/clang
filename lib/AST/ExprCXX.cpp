@@ -1512,7 +1512,8 @@ bool ParametricExpressionCallExpr::hasDependentArgs(ArrayRef<Expr *> Args) {
   for (unsigned I = 0; I < Args.size(); ++I) {
     if (Args[I]->isTypeDependent() ||
         Args[I]->isValueDependent() ||
-        Args[I]->isInstantiationDependent())
+        Args[I]->isInstantiationDependent() ||
+        Args[I]->containsUnexpandedParameterPack())
       return true;
   }
 

@@ -8003,12 +8003,34 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                                    ArrayRef<Expr*> CallArgExprs,
                                                    SourceLocation Loc,
                                                    bool ReturnsPack) {
-  // Defer instantiation if the args are value-dependent
+  if (ReturnsPack && !D->isPackOp()) {
+    Diag(Loc, diag::err_parametric_expression_not_pack_op);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+  } else if (!ReturnsPack && D->isPackOp()) {
+    Diag(Loc, diag::err_parametric_expression_is_pack_op);
+    Diag(D->getLocation(), diag::note_previous_decl)
+      << D->getDeclName();
+  }
+
+  // Defer instantiation if the args are dependent
+  // This includes any unexpanded parameter pack
   if (ParametricExpressionCallExpr::hasDependentArgs(CallArgExprs)) {
-    return ParametricExpressionCallExpr::CreateDependent(Context, Loc, D,
-                                                         BaseExpr,
-                                                         CallArgExprs,
-                                                         ReturnsPack);
+    ExprResult Dep = ParametricExpressionCallExpr::CreateDependent(
+                                                        Context,
+                                                        Loc, D,
+                                                        BaseExpr,
+                                                        CallArgExprs,
+                                                        ReturnsPack);
+    if (ReturnsPack && Dep.isUsable() &&
+        Dep.get().containsUnexpandedParameterPack()) {
+      // Pack op may not have operand containing unexpanded pack
+      Diag(Loc, err::pack_op_on_pack);
+      // TODO note the location of the offending pack
+      return ExprError();
+    }
+
+    return Dep;
   }
 
   ArrayRef<ParmVarDecl *> OldParams = D->parameters();
@@ -8269,7 +8291,7 @@ ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
     return ExprError();
   }
 
-  ArrayRef<Expr *> ArgsArray(SubExpr, 2);
+  ArrayRef<Expr *> ArgsArray(SubExpr, 1);
   return ActOnParametricExpressionCallExpr(D, /*BaseExpr=*/nullptr
                                            ArgsArray, TildeLoc);
 }

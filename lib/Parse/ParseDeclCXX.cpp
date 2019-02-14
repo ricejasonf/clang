@@ -898,8 +898,7 @@ Parser::ParseParametricExpressionDeclaration(
     // tilde which is a pack op
     if (Name.OperatorFunctionId.Operator == OO_PostfixTilde)
       IsPackOp = true;
-  }
-  else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
+  } else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(Name.getSourceRange());
     SkipMalformedDecl();
