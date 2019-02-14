@@ -5028,14 +5028,16 @@ class DependentPackOpExpr : public Expr {
   //           an object implementing `operator~~` (postfix tilde)
   Expr *SubExpr;
   SourceLocation TildeLoc;
+  bool HasTrailingLParen;
 
-  DependentPackOpExpr(Expr *E, SourceLocation TL)
+  DependentPackOpExpr(Expr *E, SourceLocation TL, bool HasTrailingLParen)
     : Expr(DependnetPackOpExprClass, E->getType(), E->getValueKind(), OK_Ordinary,
            E->isTypeDependent(), E->isValueDependent(),
            E->isInstantiationDependent(),
            /*ContainsExpandedParameterPack=*/true),
       SubExpr(E),
-      TildeLoc(TL) {}
+      TildeLoc(TL),
+      HasTrailingLParen(HasTrailingLParen) {}
 
 public:
   static DependentPackOpExpr *Create(ASTContext* C, SubExpr *S,
@@ -5043,6 +5045,13 @@ public:
 
   SourceLocation *getSubExpr() { return SubExpr; }
   SourceLocation getTildeLoc() const { return TildeLoc; }
+
+  // It may resolve to a parametric expression call
+  // that is to return a pack so info about the trailing
+  // l_paren is retained to enforce that
+  bool hasTrailingLParen() const {
+    return HasTrailingLParen;
+  }
     
   // Iterators
   child_range children() { return child_range(&SubExpr, &SubExpr + 1); }

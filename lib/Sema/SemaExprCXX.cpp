@@ -8257,7 +8257,7 @@ ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
   if (auto *Id = dyn_cast<ParametricExpressionIdExpr>(SubExpr)) {
     Id->setIsPackOpAnnotated();
     // Must be a part of call
-    if (HasTrailingLParen) {
+    if (!HasTrailingLParen) {
       Diag(TildeLoc,
            diag::err_parametric_expression_postfix_tilde_not_call);
       return ExprError();

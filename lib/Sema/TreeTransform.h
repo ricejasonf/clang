@@ -12949,6 +12949,22 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
                                              NewParmVarDecls);
 }
 
+template<typename Derived>
+ExprResult
+TreeTransform<Derived>::TransformDependentPackOpExpr(
+    DependentPackOpExpr *E) {
+  Expr *SubExpr = getDerived().TransformExpr(E->getSubExpr());
+
+  if (!getDerived().AlwaysRebuild() &&
+      SubExpr == E->getSubExpr()) {
+    return E;
+  }
+
+  return SemaRef.ActOnPackOpExpr(E->getTildeLoc(), SubExpr,
+                                 E->hasTrailingLParen());
+}
+
+
 } // end namespace clang
 
 #endif // LLVM_CLANG_LIB_SEMA_TREETRANSFORM_H
