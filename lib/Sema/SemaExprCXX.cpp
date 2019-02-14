@@ -7978,8 +7978,8 @@ public:
 
 ExprResult Sema::ActOnParametricExpressionCallExpr(
                                               ParametricExpressionIdExpr *Id,
-                                                   ArrayRef<Expr*> CallArgExprs,
-                                                   SourceLocation LParenLoc) {
+                                                ArrayRef<Expr*> CallArgExprs,
+                                                    SourceLocation LParenLoc) {
   assert(isa<ParametricExpressionIdExpr>(Id) &&
       "Expecting only ParametricExpressionIdExpr right now");
   ParametricExpressionDecl *D =
@@ -8001,12 +8001,14 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(
 ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
                                                    Expr *BaseExpr,
                                                    ArrayRef<Expr*> CallArgExprs,
-                                                   SourceLocation Loc) {
+                                                   SourceLocation Loc,
+                                                   bool ReturnsPack) {
   // Defer instantiation if the args are value-dependent
   if (ParametricExpressionCallExpr::hasDependentArgs(CallArgExprs)) {
     return ParametricExpressionCallExpr::CreateDependent(Context, Loc, D,
                                                          BaseExpr,
-                                                         CallArgExprs);
+                                                         CallArgExprs,
+                                                         ReturnsPack);
   }
 
   ArrayRef<ParmVarDecl *> OldParams = D->parameters();
@@ -8246,6 +8248,28 @@ ExprResult Sema::ActOnPackOpExpr(SourceLocation TildeLoc, Expr* SubExpr,
     return DependentPackOpExpr::Create(Context, SubExpr, TildeLoc);
   }
 
-  // The object must have a member `operator~~`.
-  // TODO Find it and call it
+  CXXRecordDecl *Record = SubExpr->getType()->getAsCXXRecordDecl();
+  if (!Record) {
+    Diag(TildeLoc, diag::err_typecheck_unary_expr)
+      << Subexpr->getType();
+    return ExprError();
+  }
+
+  // The record must have a member `operator~~`.
+  // Look it up it and call it
+  DeclarationNameInfo OpName = DeclarationNameInfo(
+    Context.DeclarationNames.getCXXOperatorName(OO_PostfixTilde),
+    TildeLoc);
+  LookupResult R(*this, OpName, LookupOrdinaryName);
+  LookupQualifiedName(R, Record);
+  auto *D = R.getAsSingle<ParametricExpressionDecl>();
+
+  if (!D) {
+    // Lookup handles the diagnostics
+    return ExprError();
+  }
+
+  ArrayRef<Expr *> ArgsArray(SubExpr, 2);
+  return ActOnParametricExpressionCallExpr(D, /*BaseExpr=*/nullptr
+                                           ArgsArray, TildeLoc);
 }

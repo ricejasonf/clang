@@ -4846,20 +4846,24 @@ class DependentParametricExpressionCallExpr : public Expr {
   Expr *BaseExpr;
   Expr **CallArgs;
   unsigned NumArgs;
+  bool ReturnsPack;
 
 public:
   DependentParametricExpressionCallExpr(SourceLocation BL, QualType QT,
                                         ParametricExpressionDecl *D,
                                         Expr* BaseExpr,
-                                        Expr** Args, unsigned NumArgs)
+                                        Expr** Args, unsigned NumArgs,
+                                        bool Returnspack)
     : Expr(DependentParametricExpressionCallExprClass, QT, VK_RValue,
            OK_Ordinary, /*TypeDependent*/ true, /*ValueDependent*/ false,
-           /*InstantiationDependent*/ false, /*ContainsPack*/ false),
+           /*InstantiationDependent*/ false, /*ContainsPack*/ ReturnsPack),
       BeginLoc(BL),
       TheDecl(D),
       BaseExpr(BaseExpr),
       CallArgs(Args),
-      NumArgs(NumArgs) {}
+      NumArgs(NumArgs),
+      ReturnsPack(ReturnsPack) {}
+
   ParametricExpressionDecl *getDecl() const {
     return TheDecl;
   }
@@ -4873,6 +4877,8 @@ public:
   }
 
   unsigned getNumArgs() const { return NumArgs; }
+
+  bool getReturnsPack() const { return ReturnsPack; }
 
   // Iterators
   child_range children() {
@@ -4915,7 +4921,8 @@ public:
 
   static DependentParametricExpressionCallExpr *
   CreateDependent(ASTContext &C, SourceLocation BL, ParametricExpressionDecl *D,
-                  Expr* BaseExpr, ArrayRef<Expr *> CallArgs);
+                  Expr* BaseExpr, ArrayRef<Expr *> CallArgs,
+                  bool ReturnsPack = false);
 
   static bool hasDependentArgs(ArrayRef<Expr *> Args);
 

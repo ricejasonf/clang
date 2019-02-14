@@ -887,32 +887,34 @@ Parser::ParseParametricExpressionDeclaration(
     return nullptr;
   }
 
+  // TODO for non operator names only
   // Consume optional ~ (tilde) for
   // specifying a pack operation (returning a pack)
   // consume optional kw_static specifier for class members
-  SourceLocation TildeLoc;
-  bool IsPackOp = TryConsumeToken(tok::kw_tilde, TildeLoc);
-
-  Scope* S = getCurScope();
-  if (ExpectAndConsume(tok::l_paren)) {
-    return nullptr;
-  }
+  bool IsPackOp = false;
 
   if (Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
-#if 0
-    // TODO reenable operator ids
-    Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
-      << FixItHint::CreateRemoval(Name.getSourceRange());
-    SkipMalformedDecl();
-    return nullptr;
-#endif
+    // check for `operator~~` to see if this is a postfix
+    // tilde which is a pack op
+    if (Name.OperatorFunctionId.Operator == OO_PostfixTilde)
+      IsPackOp = true;
   }
   else if (Name.getKind() != UnqualifiedIdKind::IK_Identifier) {
     Diag(Name.getBeginLoc(), diag::err_parametric_expression_name_invalid)
       << FixItHint::CreateRemoval(Name.getSourceRange());
     SkipMalformedDecl();
     return nullptr;
+  } else {
+    // The identifier is followed optionally by a tilde
+    // to denote it must return a pack
+    IsPackOp = TryConsumeToken(tok::kw_tilde);
   }
+
+  Scope* S = getCurScope();
+  if (ExpectAndConsume(tok::l_paren)) {
+    return nullptr;
+  }
+
 
   // Params
 

@@ -1482,7 +1482,8 @@ ParametricExpressionCallExpr::CreateDependent(
                                         ASTContext &C, SourceLocation BL,
                                         ParametricExpressionDecl *D,
                                         Expr* BaseExpr,
-                                        ArrayRef<Expr *> CallArgs) {
+                                        ArrayRef<Expr *> CallArgs,
+                                        bool ReturnsPack) {
   Expr** Args;
   if (!CallArgs.empty()) {
     Args = new (C) Expr*[CallArgs.size()];
@@ -1492,7 +1493,8 @@ ParametricExpressionCallExpr::CreateDependent(
   DependentParametricExpressionCallExpr *
   New = new (C) DependentParametricExpressionCallExpr(BL, C.DependentTy, D,
                                                       BaseExpr, Args,
-                                                      CallArgs.size());
+                                                      CallArgs.size(),
+                                                      ReturnsPack);
 
   for (unsigned I = 0; I < CallArgs.size(); ++I) {
     if (CallArgs[I]->isValueDependent())

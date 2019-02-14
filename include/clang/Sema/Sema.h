@@ -4704,7 +4704,8 @@ public:
   ExprResult ActOnParametricExpressionCallExpr(
                         ParametricExpressionDecl *D,
                         Expr *BaseExpr, ArrayRef<Expr*> ArgExprs,
-                        SourceLocation Loc);
+                        SourceLocation Loc,
+                        bool ReturnsPack = false);
   ExprResult BuildParametricExpressionCallExpr(
                         SourceLocation BeginLoc, CompoundStmt *Body,
                         ArrayRef<ParmVarDecl*> Params);
