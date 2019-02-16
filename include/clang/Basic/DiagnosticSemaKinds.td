@@ -9465,12 +9465,16 @@ def err_std_compare_type_not_supported : Error<
 
 // unary pack operation via postfix tilde
 def err_parametric_expression_postfix_tilde_not_call: Error<
-  "A postfix tilde on a parametric expression name must be "
+  "postfix tilde on a parametric expression name must be "
   "part of a call">;
 def err_parametric_expression_not_pack_op: Error<
-  "Parametric expression called with postfix tilde does not return a pack">;
+  "parametric expression called with postfix tilde does not return a pack">;
 def err_parametric_expression_is_pack_op: Error<
-  "Parametric expression returning pack called without postfix tilde">;
+  "parametric expression returning pack called without postfix tilde">;
 def err_parametric_expression_pack_op_transparent: Error<
-  "Parametric expression returning pack must not require scope"
+  "parametric expression returning pack must not require scope">;
+def err_no_member_pack_operator: Error<
+  "type %0 does not implement pack operator">;
+def err_parametric_expression_must_return_pack: Error<
+  "parametric expression pack operation must return unexpanded pack">;
 } // end of sema component.

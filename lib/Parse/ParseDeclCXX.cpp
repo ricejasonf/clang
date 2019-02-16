@@ -887,14 +887,10 @@ Parser::ParseParametricExpressionDeclaration(
     return nullptr;
   }
 
-  // TODO for non operator names only
-  // Consume optional ~ (tilde) for
-  // specifying a pack operation (returning a pack)
-  // consume optional kw_static specifier for class members
   bool IsPackOp = false;
 
   if (Name.getKind() == UnqualifiedIdKind::IK_OperatorFunctionId) {
-    // check for `operator~~` to see if this is a postfix
+    // check for `operator()~` to see if this is a postfix
     // tilde which is a pack op
     if (Name.OperatorFunctionId.Operator == OO_PostfixTilde)
       IsPackOp = true;
@@ -904,8 +900,8 @@ Parser::ParseParametricExpressionDeclaration(
     SkipMalformedDecl();
     return nullptr;
   } else {
-    // The identifier is followed optionally by a tilde
-    // to denote it must return a pack
+    // The identifier may be followed optionally by a
+    // tilde to denote it must return a pack
     IsPackOp = TryConsumeToken(tok::tilde);
   }
 

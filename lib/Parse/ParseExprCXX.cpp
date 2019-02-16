@@ -2282,12 +2282,22 @@ bool Parser::ParseUnqualifiedIdOperator(CXXScopeSpec &SS, bool EnteringContext,
       BalancedDelimiterTracker T(*this, tok::l_paren);
       T.consumeOpen();
       T.consumeClose();
+      // check for postfix tilde ()~
+      SourceLocation TildeLoc;
       if (T.getCloseLocation().isInvalid())
         return true;
 
       SymbolLocations[SymbolIdx++] = T.getOpenLocation();
       SymbolLocations[SymbolIdx++] = T.getCloseLocation();
-      Op = OO_Call;
+
+      bool IsPostfixTilde = TryConsumeToken(tok::tilde, TildeLoc);
+      if (IsPostfixTilde) {
+        SymbolLocations[SymbolIdx++] = TildeLoc;
+        Op = OO_PostfixTilde;
+      }
+      else {
+        Op = OO_Call;
+      }
       break;
     }
 

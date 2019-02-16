@@ -2690,7 +2690,7 @@ static void AddTypedNameChunk(ASTContext &Context, const PrintingPolicy &Policy,
       case OO_Array_Delete: OperatorName = "operator delete[]"; break;
       case OO_Call:         OperatorName = "operator()"; break;
       case OO_Subscript:    OperatorName = "operator[]"; break;
-      case OO_PostfixTilde: OperatorName = "operator~~"; break;
+      case OO_PostfixTilde: OperatorName = "operator()~"; break;
       }
       Result.AddTypedTextChunk(OperatorName);
       break;

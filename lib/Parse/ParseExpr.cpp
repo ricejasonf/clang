@@ -1806,7 +1806,7 @@ Parser::ParsePostfixExpressionSuffix(ExprResult LHS) {
     case tok::tilde: // postfix-expression '~'
       if (!LHS.isInvalid()) {
         LHS = Actions.ActOnPackOpExpr(Tok.getLocation(), LHS.get(),
-                                      Tok.is(tok::l_paren));
+                                      NextToken().is(tok::l_paren));
       }
       ConsumeToken();
       break;

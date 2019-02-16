@@ -1571,9 +1571,13 @@ TemplateInstantiator::TransformSubstTemplateTypeParmPackType(
 ExprResult
 TemplateInstantiator::TransformResolvedUnexpandedPackExpr(
                                     ResolvedUnexpandedPackExpr *E) {
-  if (getSema().ArgumentPackSubstitutionIndex != -1)
+  if (getSema().ArgumentPackSubstitutionIndex != -1) {
+    assert(static_cast<unsigned>(getSema().ArgumentPackSubstitutionIndex)
+              < E->getNumExprs()
+      && "ArgumentPackSubstitutionIndex is out of range");
     return TransformExpr(
         E->getExpansion(getSema().ArgumentPackSubstitutionIndex));
+  }
 
   if (!AlwaysRebuild())
     return E;

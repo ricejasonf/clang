@@ -61,6 +61,9 @@ namespace {
     void addUnexpanded(ResolvedUnexpandedPackExpr *E) {
       Unexpanded.push_back({E, E->getBeginLoc()});
     }
+    void addUnexpanded(DependentPackOpExpr *E) {
+      Unexpanded.push_back({E, E->getBeginLoc()});
+    }
 
   public:
     explicit CollectUnexpandedParameterPacksVisitor(
@@ -102,6 +105,11 @@ namespace {
     }
 
     bool VisitResolvedUnexpandedPackExpr(ResolvedUnexpandedPackExpr *E) {
+      addUnexpanded(E);
+      return true;
+    }
+
+    bool VisitDependentPackOpExpr(DependentPackOpExpr *E) {
       addUnexpanded(E);
       return true;
     }
@@ -658,9 +666,11 @@ bool Sema::CheckParameterPacksForExpansion(
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
       Name = TTP->getIdentifier();
-    } else if (ResolvedUnexpandedPackExpr *RP
-        = i->first.dyn_cast<ResolvedUnexpandedPackExpr*>()) {
+    } else if (auto *RP = i->first.dyn_cast<ResolvedUnexpandedPackExpr*>()) {
       ResolvedPack = RP;
+    } else if (i->first.is<DependentPackOpExpr*>()) {
+      ShouldExpand = false;
+      continue;
     } else {
       NamedDecl *ND = i->first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND))
@@ -792,12 +802,14 @@ Optional<unsigned> Sema::getNumArgumentsInExpansion(QualType T,
           = Unexpanded[I].first.dyn_cast<const TemplateTypeParmType *>()) {
       Depth = TTP->getDepth();
       Index = TTP->getIndex();
-    } else if (ResolvedUnexpandedPackExpr *PE
+    } else if (auto *PE
           = Unexpanded[I].first.dyn_cast<ResolvedUnexpandedPackExpr *>()) {
       unsigned Size = PE->getNumExprs();
       assert((!Result || *Result == Size) && "inconsistent pack sizes");
       Result = Size;
       continue;
+    } else if (Unexpanded[I].first.is<DependentPackOpExpr *>()) {
+      return None;
     } else {
       NamedDecl *ND = Unexpanded[I].first.get<NamedDecl *>();
       if (isa<ParmVarDecl>(ND)) {

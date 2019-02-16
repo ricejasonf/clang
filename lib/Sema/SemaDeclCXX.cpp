@@ -10661,15 +10661,15 @@ Decl *Sema::ActOnFinishParametricExpressionDecl(
     // pack op must be a "transparent" transformation
     Diag(New->getBeginLoc(),
          diag::err_parametric_expression_pack_op_transparent);
-    return ExprError();
-  }
-
-  if (!NeedsRAII && !New->isPackOp() &&
-    cast<Expr>(Body)->containsUnexpandedParameterPack()) {
+  } else if (!NeedsRAII && !New->isPackOp() &&
+      static_cast<Expr*>(Body)->containsUnexpandedParameterPack()) {
     // may not return pack unless specified in declarator
-    DiagnoseUnexpandedParameterPacks(Body->getBeginLoc(),
+    DiagnoseUnexpandedParameterPack(static_cast<Expr*>(Body),
                                      UPPC_Expression);
-    return ExprError();
+  } else if (New->isPackOp() &&
+      !static_cast<Expr*>(Body)->containsUnexpandedParameterPack()) {
+    Diag(Body->getBeginLoc(),
+         diag::err_parametric_expression_must_return_pack);
   }
 
   // Body isn't necessarily a compound statement so we will see
