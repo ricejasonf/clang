@@ -1285,8 +1285,9 @@ ExprResult Sema::ActOnCXXFoldExpr(SourceLocation LParenLoc, Expr *LHS,
   // expression returns an expression containing an unexpanded pack.
   if (Result.isUsable() && 
       (!LHS || containsAllResolvedPacks(LHS)) &&
-      (!RHS || containsAllResolvedPacks(RHS)))
+      (!RHS || containsAllResolvedPacks(RHS))) {
     return SubstExpr(Result.get(), /*TemplateArgs=*/{});
+  }
 
   return Result;
 }

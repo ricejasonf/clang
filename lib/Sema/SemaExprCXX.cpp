@@ -8115,7 +8115,7 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
     Expr *OutputExpr = cast<Expr>(Output);
     // Raw transformation with no AST wrapper
 
-    if (ReturnsPack) {
+    if (ReturnsPack && !isa<DependentPackOpExpr>(OutputExpr)) {
       assert(OutputExpr->containsUnexpandedParameterPack() &&
         "parametric expression does not return pack but a pack was found");
       return BuildResolvedUnexpandedPackExpr(Loc, OutputExpr, TemplateArgs);
@@ -8222,23 +8222,51 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
 ExprResult Sema::BuildResolvedUnexpandedPackExpr(
                                 SourceLocation BeginLoc, Expr* Pattern, 
                                 MultiLevelTemplateArgumentList TemplateArgs) {
-  // Fake the PackExpansionExpr funk
-  Expr *Expansion = new (Context) PackExpansionExpr(Context.DependentTy,
-                                                    Pattern,
-                                                    Pattern->getBeginLoc(), 
-                                                    None);
+  bool ShouldExpand = true;
+  bool RetainExpansion = false;
+  Optional<unsigned> NumExpansions = None;
+  SmallVector<UnexpandedParameterPack, 2> Unexpanded;
   SmallVector<Expr*, 12> ResultExprs;
-  if (SubstExprs(ArrayRef<Expr*>(&Expansion, &Expansion + 1),
-                 /*IsCall=*/false, TemplateArgs,
-                 ResultExprs))
+  collectUnexpandedParameterPacks(Pattern, Unexpanded);
+
+  // Resolve any DependentPackOpExprs
+
+  for (UnexpandedParameterPack& UP : Unexpanded) {
+    if (auto *DP = UP.first.dyn_cast<DependentPackOpExpr*>()) {
+      ExprResult Result = SubstExpr(DP, TemplateArgs);
+      if (Result.isInvalid())
+        return ExprError();
+      // Well I hope we can mutate these things
+      assert(isa<ResolvedUnexpandedPackExpr>(Result.get()) &&
+        "DependentPackOp not resolved properly");
+      UP.first = Result.getAs<ResolvedUnexpandedPackExpr>();
+    }
+  }
+
+  if (CheckParameterPacksForExpansion(BeginLoc, Pattern->getSourceRange(),
+                                     Unexpanded, TemplateArgs, ShouldExpand,
+                                     RetainExpansion, NumExpansions))
     return ExprError();
 
-#ifndef NDEBUG
-  for (auto *RE : ResultExprs) {
-    assert(!RE->containsUnexpandedParameterPack() &&
-           "Resolved unexpanded pack not actually resolved");
+
+  // Actually expand
+
+  assert(ShouldExpand && "Resolved pack should be resolved");
+  for (unsigned I = 0; I != *NumExpansions; ++I) {
+    Sema::ArgumentPackSubstitutionIndexRAII SubstIndex(*this, I);
+    // Is there overhead calling it externally like this?
+    ExprResult Out = SubstExpr(Pattern, TemplateArgs);
+    if (Out.isInvalid())
+      return ExprError();
+
+    assert(!Out.get()->containsUnexpandedParameterPack() &&
+           "Resolved pack contains nested pack");
+
+    ResultExprs.push_back(Out.get());
   }
-#endif
+
+
+  // Create the ResolvedUnexpandedPackExpr
 
   TemplateTypeParmDecl *DummyTemplateParam =
       TemplateTypeParmDecl::Create(
@@ -8250,7 +8278,6 @@ ExprResult Sema::BuildResolvedUnexpandedPackExpr(
   QualType T = Context.getPackExpansionType(
                       QualType(DummyTemplateParam->getTypeForDecl(), 0),
                       ResultExprs.size());
-  //QualType T = Context.DependentTy;
   return ResolvedUnexpandedPackExpr::Create(Context, BeginLoc, T, ResultExprs);
 }
 
