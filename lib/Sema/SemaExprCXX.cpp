@@ -8213,7 +8213,7 @@ ParmVarDecl *Sema::BuildParametricExpressionParam(ParmVarDecl *Old,
           "Param with non-dependent init should not be dependent");
   } else {
     // Using Params can contain things like packs and overloaded function ids
-    New->setUsingSpecified(true);
+    New->setUsingSpecified(Old->isUsingSpecified());
     New->setInit(ArgExpr);
   }
   return New;
