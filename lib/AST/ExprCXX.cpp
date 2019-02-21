@@ -1484,15 +1484,19 @@ ParametricExpressionCallExpr::CreateDependent(
                                         Expr* BaseExpr,
                                         ArrayRef<Expr *> CallArgs,
                                         bool ReturnsPack) {
-  Expr** Args;
-  if (!CallArgs.empty()) {
-    Args = new (C) Expr*[CallArgs.size()];
-    std::copy(CallArgs.begin(), CallArgs.end(), Args);
+  Stmt** Children;
+  if (BaseExpr) {
+    Children = new (C) Stmt*[CallArgs.size() + 1];
+    Children[0] = BaseExpr;
+    std::copy(CallArgs.begin(), CallArgs.end(), Children + 1);
+  } else if (!CallArgs.empty()) {
+    Children = new (C) Stmt*[CallArgs.size()];
+    std::copy(CallArgs.begin(), CallArgs.end(), Children);
   }
 
   DependentParametricExpressionCallExpr *
   New = new (C) DependentParametricExpressionCallExpr(BL, C.DependentTy, D,
-                                                      BaseExpr, Args,
+                                                      BaseExpr, Children,
                                                       CallArgs.size(),
                                                       ReturnsPack);
 
