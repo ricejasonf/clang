@@ -4797,7 +4797,7 @@ class ParametricExpressionIdExpr : public Expr {
   SourceLocation BeginLoc;
   ParametricExpressionDecl *DefinitionDecl;
   Expr *BaseExpr;
-  bool IsPackOpAnnotated : 1;
+  bool IsPackOpAnnotated;
 
   ParametricExpressionIdExpr(SourceLocation BL, QualType QT,
                              ParametricExpressionDecl *D,
@@ -4807,7 +4807,8 @@ class ParametricExpressionIdExpr : public Expr {
            false, false, false, false),
       BeginLoc(BL),
       DefinitionDecl(D),
-      BaseExpr(Base) {}
+      BaseExpr(Base),
+      IsPackOpAnnotated(IsPackOpAnnotated) {}
 
 public:
   static ParametricExpressionIdExpr *Create(ASTContext &C, SourceLocation BL,
