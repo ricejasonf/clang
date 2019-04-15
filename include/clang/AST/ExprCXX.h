@@ -4920,8 +4920,7 @@ public:
 class ParametricExpressionCallExpr : public Expr {
   SourceLocation BeginLoc;
   ParmVarDecl** ParamInfo;
-  CompoundStmt *Body;
-  Expr **Args;
+  Stmt **Children; // Body + Args
   unsigned NumParams = 0;
 
   ParametricExpressionCallExpr(SourceLocation BL,
@@ -4929,10 +4928,37 @@ class ParametricExpressionCallExpr : public Expr {
     : Expr(ParametricExpressionCallExprClass, QT, VK, OK_Ordinary,
            false, false, false, false),
       BeginLoc(BL) {}
+  
+  ParametricExpressionCallExpr(SourceLocation BL, Expr* E)
+    : Expr(ParametricExpressionCallExprClass,
+           E->getType(), E->getValueKind(), E->getObjectKind(),
+           E->isTypeDependent(),
+           E->isValueDependent(),
+           E->isInstantiationDependent(),
+           E->containsUnexpandedParameterPack()),
+      BeginLoc(BL)
+      {}
+
+  // must be called after Init
+  void setBody(Stmt *B) {
+    Children[0] = B;
+  }
+
+  Stmt *getBody() const {
+    return Children[0];
+  }
+
+  static void Init(ASTContext &C, ParametricExpressionCallExpr *New,
+                   ArrayRef<ParmVarDecl *> Params);
+
 public:
   static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
                                               CompoundStmt *B,
                                               QualType QT, ExprValueKind VK,
+                                              ArrayRef<ParmVarDecl *> Params);
+
+  static ParametricExpressionCallExpr *Create(ASTContext &C, SourceLocation BL,
+                                              Expr *E,
                                               ArrayRef<ParmVarDecl *> Params);
 
   static DependentParametricExpressionCallExpr *
@@ -4942,15 +4968,24 @@ public:
 
   static bool hasDependentArgs(ArrayRef<Expr *> Args);
 
-  CompoundStmt *getBody() const {
-    return Body;
+  CompoundStmt *getScopedBody() const {
+    assert(isa<CompoundStmt>(getBody()) && "Body is not a compound statement");
+    return cast<CompoundStmt>(getBody());
   }
 
-  void setBody(CompoundStmt *B) {
-    Body = B;
+  Expr *getExprBody() const {
+    assert(!isa<CompoundStmt>(getBody()) && "Body is not an expression");
+    return cast<Expr>(getBody());
   }
 
-  void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
+  bool isScoped() const {
+    return isa<CompoundStmt>(getBody());
+  }
+
+  // Aliases an expression with no parameter binding
+  bool isTransparent() const;
+
+  //void setParams(ASTContext &C, ArrayRef<ParmVarDecl *> NewParamInfo);
   unsigned getNumParams() const { return NumParams; }
 
   // ArrayRef interface to parameters.
@@ -4961,17 +4996,10 @@ public:
     return {ParamInfo, getNumParams()};
   }
 
-  ArrayRef<Expr *> init_expressions() const {
-    return {Args, NumParams};
-  }
-  MutableArrayRef<Expr *> init_expressions() {
-    return {Args, NumParams};
-  }
-
   // Iterators
   child_range children() {
-    return child_range(reinterpret_cast<Stmt**>(Args),
-                       reinterpret_cast<Stmt**>(Args) + NumParams);
+    // The first child is the Body
+    return child_range(Children, Children + 1 + NumParams);
   }
 
   SourceLocation getBeginLoc() const LLVM_READONLY { return BeginLoc; }

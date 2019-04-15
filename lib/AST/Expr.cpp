@@ -3164,10 +3164,15 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case ShuffleVectorExprClass:
   case ConvertVectorExprClass:
   case AsTypeExprClass:
-  case ParametricExpressionCallExprClass:
   case DependentParametricExpressionCallExprClass:
   case ResolvedUnexpandedPackExprClass:
     // These have a side-effect if any subexpression does.
+    break;
+
+  case ParametricExpressionCallExprClass:
+    // Scoped Parametric Expressions might have side effects
+    if (cast<ParametricExpressionCallExpr>(this)->isScoped())
+      return true;
     break;
 
   case UnaryOperatorClass:

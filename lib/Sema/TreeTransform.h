@@ -3279,6 +3279,13 @@ public:
                                                ArrayRef<ParmVarDecl *> Params) {
     return SemaRef.BuildParametricExpressionCallExpr(BeginLoc, Body, Params);
   }
+  ExprResult RebuildParametricExpressionCallExpr(
+                                               SourceLocation BeginLoc,
+                                               Expr *Body,
+                                               ArrayRef<ParmVarDecl *> Params) {
+    return ParametricExpressionCallExpr::Create(SemaRef.Context, BeginLoc, Body,
+                                                Params);
+  }
 
 private:
   TypeLoc TransformTypeInObjectScope(TypeLoc TL,
@@ -12916,6 +12923,7 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
   bool ParamChanged = false;
   llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls{};
   for (ParmVarDecl* PD : E->parameters()) {
+    assert(!PD->isUsingSpecified() && "Using parameters should be substituted already");
     ExprResult NewInit = getDerived().TransformExpr(PD->getInit());
     if (NewInit.isInvalid())
       return ExprError();
@@ -12939,18 +12947,27 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
 
   // Transform the Body
 
-  StmtResult CSResult = getDerived().TransformStmt(E->getBody());
-  if (CSResult.isInvalid())
-    return ExprError();
-
-  if (!getDerived().AlwaysRebuild() && !ParamChanged &&
-      CSResult.get() == E->getBody()) {
-    return E;
+  if (E->isScoped()) {
+    StmtResult CSResult = getDerived().TransformStmt(E->getScopedBody());
+    if (CSResult.isInvalid())
+      return ExprError();
+    if (!getDerived().AlwaysRebuild() && !ParamChanged &&
+        CSResult.get() == E->getScopedBody())
+      return E;
+    return RebuildParametricExpressionCallExpr(E->getBeginLoc(),
+                                               CSResult.getAs<CompoundStmt>(),
+                                               NewParmVarDecls);
+  } else {
+    ExprResult EResult = getDerived().TransformExpr(E->getExprBody());
+    if (EResult.isInvalid())
+      return ExprError();
+    if (!getDerived().AlwaysRebuild() && !ParamChanged &&
+        EResult.get() == E->getExprBody())
+      return E;
+    return RebuildParametricExpressionCallExpr(E->getBeginLoc(),
+                                               EResult.get(),
+                                               NewParmVarDecls);
   }
-
-  return RebuildParametricExpressionCallExpr(E->getBeginLoc(),
-                                             CSResult.getAs<CompoundStmt>(),
-                                             NewParmVarDecls);
 }
 
 template<typename Derived>

@@ -1450,6 +1450,25 @@ TypeTraitExpr *TypeTraitExpr::CreateDeserialized(const ASTContext &C,
 
 void ArrayTypeTraitExpr::anchor() {}
 
+void ParametricExpressionCallExpr::Init(ASTContext &C, 
+                                        ParametricExpressionCallExpr *New,
+                                        ArrayRef<ParmVarDecl *> Params) {
+  // We include param initializers in the children()
+  New->Children = new (C) Stmt*[Params.size() + 1];
+  New->NumParams = Params.size();
+  if (!Params.empty()) {
+    New->ParamInfo = new (C) ParmVarDecl*[Params.size()];
+    std::copy(Params.begin(), Params.end(), New->ParamInfo);
+  }
+
+  for (unsigned I = 0; I < Params.size(); ++I) {
+    New->Children[I + 1] = Params[I]->getInit();
+    // FIXME I think it is impossible to get here with
+    //       an unexpanded parameter pack
+    if (Params[I]->getInit()->containsUnexpandedParameterPack())
+      New->setContainsUnexpandedParameterPack(true);
+  }
+}
 
 ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
                                         ASTContext &C, SourceLocation BL,
@@ -1458,22 +1477,19 @@ ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
                                         ArrayRef<ParmVarDecl *> Params) {
   ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(
                                                                 BL, QT, VK);
-  New->NumParams = Params.size();
+  ParametricExpressionCallExpr::Init(C, New, Params);
+  New->setBody(Body);
+  return New;
+}
 
-  if (!Params.empty()) {
-    New->ParamInfo = new (C) ParmVarDecl*[Params.size()];
-    std::copy(Params.begin(), Params.end(), New->ParamInfo);
-  }
-
-  New->Args = new (C) Expr*[Params.size()];
-
-  New->Body = Body;
-  for (unsigned I = 0; I < Params.size(); ++I) {
-    New->Args[I] = Params[I]->getInit();
-    if (New->Args[I]->containsUnexpandedParameterPack())
-      New->setContainsUnexpandedParameterPack(true);
-  }
-
+ParametricExpressionCallExpr *ParametricExpressionCallExpr::Create(
+                                        ASTContext &C, SourceLocation BL,
+                                        Expr *Body,
+                                        ArrayRef<ParmVarDecl *> Params) {
+  ParametricExpressionCallExpr *New = new (C) ParametricExpressionCallExpr(
+                                                                BL, Body);
+  ParametricExpressionCallExpr::Init(C, New, Params);
+  New->setBody(Body);
   return New;
 }
 
@@ -1554,4 +1570,3 @@ DependentPackOpExpr::Create(ASTContext &C, Expr* SubExpr,
     "Unexpanded packs are not allowed in the LHS of a pack op");
   return new (C) DependentPackOpExpr(SubExpr, TLoc, HasTrailingLParen);
 }
-                                                    

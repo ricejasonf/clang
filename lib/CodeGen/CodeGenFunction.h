@@ -3985,15 +3985,16 @@ public:
 
   RValue EmitAtomicExpr(AtomicExpr *E);
 
-  Address EmitParametricExpressionCallExprInternal(
-                                      const ParametricExpressionCallExpr* E,
-                                      AggValueSlot AggSlot);
+  void EmitParametricExpressionCallExprParams(
+                                const ParametricExpressionCallExpr* E);
+  Address EmitParametricExpressionCallExprScoped(
+                                const ParametricExpressionCallExpr* E,
+                                AggValueSlot AggSlot);
   RValue EmitParametricExpressionCallExpr(
-                                        const ParametricExpressionCallExpr* E,
-                                        AggValueSlot AggSlot = 
-                                              AggValueSlot::ignored());
+                                const ParametricExpressionCallExpr* E,
+                                AggValueSlot AggSlot = AggValueSlot::ignored());
   LValue EmitParametricExpressionCallExprLValue(
-                                        const ParametricExpressionCallExpr* E);
+                                const ParametricExpressionCallExpr* E);
 
   //===--------------------------------------------------------------------===//
   //                         Annotations Emission

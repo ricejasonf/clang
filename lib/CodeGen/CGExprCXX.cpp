@@ -2270,13 +2270,22 @@ void CodeGenFunction::EmitLambdaExpr(const LambdaExpr *E, AggValueSlot Slot) {
   }
 }
 
-Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
+void CodeGenFunction::EmitParametricExpressionCallExprParams(
+                                    const ParametricExpressionCallExpr* E) {
+    for (ParmVarDecl* PD : E->parameters()) {
+      if (!PD->isUsingSpecified() && !(PD->isConstexpr() && !PD->getDeclName())) {
+        EmitAutoVarDecl(*PD);
+      }
+    }
+}
+
+Address CodeGenFunction::EmitParametricExpressionCallExprScoped(
                                     const ParametricExpressionCallExpr* E,
                                     AggValueSlot AggSlot) {
   ParametricExpressionCallExprScope PScope(*this);
 
   QualType RetTy = E->getType();
-  CompoundStmt *Body = E->getBody();
+  CompoundStmt *Body = E->getScopedBody();
 
   /*
   PrettyStackTraceLoc CrashInfo(getContext().getSourceManager(), Body->getBeginLoc(),
@@ -2292,11 +2301,7 @@ Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
     ReturnValue = CreateMemTemp(RetTy);
   }
 
-  for (ParmVarDecl* PD : E->parameters()) {
-    if (!PD->isUsingSpecified() && !(PD->isConstexpr() && !PD->getDeclName())) {
-      EmitAutoVarDecl(*PD);
-    }
-  }
+  EmitParametricExpressionCallExprParams(E);
 
   EmitCompoundStmtWithoutScope(*Body);
   EmitReturnBlock();
@@ -2307,13 +2312,23 @@ Address CodeGenFunction::EmitParametricExpressionCallExprInternal(
 RValue CodeGenFunction::EmitParametricExpressionCallExpr(
                                       const ParametricExpressionCallExpr* E,
                                       AggValueSlot AggSlot) {
-  Address ResultAddr = EmitParametricExpressionCallExprInternal(E, AggSlot);
-  return convertTempToRValue(ResultAddr, E->getType(), E->getBeginLoc());
+  if (E->isScoped()) {
+    Address ResultAddr = EmitParametricExpressionCallExprScoped(E, AggSlot);
+    return convertTempToRValue(ResultAddr, E->getType(), E->getBeginLoc());
+  } else {
+    EmitParametricExpressionCallExprParams(E);
+    return EmitAnyExpr(E->getExprBody(), AggSlot); 
+  }
 }
 
 LValue CodeGenFunction::EmitParametricExpressionCallExprLValue(
                                       const ParametricExpressionCallExpr* E) {
-  Address ResultAddr = EmitParametricExpressionCallExprInternal(E,
-                                                    AggValueSlot::ignored());
-  return MakeAddrLValue(ResultAddr, E->getType());
+  if (E->isScoped()) {
+    Address ResultAddr = EmitParametricExpressionCallExprScoped(E,
+                                                      AggValueSlot::ignored());
+    return MakeAddrLValue(ResultAddr, E->getType());
+  } else {
+    EmitParametricExpressionCallExprParams(E);
+    return EmitLValue(E->getExprBody()); 
+  }
 }

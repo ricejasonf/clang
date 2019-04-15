@@ -7970,6 +7970,10 @@ public:
 
   // Don't visit enclosed scopes
 
+  bool TraverseParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
+    return true;
+  }
+
   bool VisitParametricExpressionCallExpr(ParametricExpressionCallExpr *) {
     return true;
   }
@@ -8120,12 +8124,20 @@ ExprResult Sema::ActOnParametricExpressionCallExpr(ParametricExpressionDecl* D,
         "parametric expression does not return pack but a pack was found");
       return BuildResolvedUnexpandedPackExpr(Loc, OutputExpr, TemplateArgs);
     }
+
     // Raw transformation with no AST wrapper
-    return SubstExpr(OutputExpr, TemplateArgs);
+    ExprResult ExprRes = SubstExpr(OutputExpr, TemplateArgs);
+    if (ExprRes.isInvalid())
+      return ExprError();
+
+    return ParametricExpressionCallExpr::Create(Context, Loc,
+                                                ExprRes.get(),
+                                                NewParmVarDecls);
   }
 }
 
-ExprResult Sema::BuildParametricExpressionCallExpr(SourceLocation BeginLoc,
+ExprResult Sema::BuildParametricExpressionCallExpr(
+                                             SourceLocation BeginLoc,
                                              CompoundStmt *Body,
                                              ArrayRef<ParmVarDecl *> Params) {
   // Assume type dependence if there is value dependent arguments
