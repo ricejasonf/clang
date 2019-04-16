@@ -5118,6 +5118,15 @@ public:
       return;
     VisitIgnoredValue(E);
   }
+
+  bool VisitParametricExpressionCallExpr(const ParametricExpressionCallExpr *PE) {
+    if (PE->isScoped()) {
+      // FIXME Can we do this? ... maybe
+      return Error(PE);
+    }
+
+    return StmtVisitorTy::Visit(PE->getExprBody());
+  }
 };
 
 } // namespace

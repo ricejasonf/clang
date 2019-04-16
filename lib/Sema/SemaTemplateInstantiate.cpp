@@ -674,6 +674,9 @@ Optional<TemplateDeductionInfo *> Sema::isSFINAEContext() const {
       if (isa<TypeAliasTemplateDecl>(Active->Entity))
         break;
       // Fall through.
+      if (isa<ParametricExpressionDecl>(Active->Entity))
+        break;
+      // Fall through.
     case CodeSynthesisContext::DefaultFunctionArgumentInstantiation:
     case CodeSynthesisContext::ExceptionSpecInstantiation:
       // This is a template instantiation, so there is no SFINAE.
