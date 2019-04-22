@@ -14963,6 +14963,15 @@ bool Sema::tryCaptureVariable(
   if (Var->isInitCapture())
     VarDC = VarDC->getParent();
 
+  // Parametric expressions assume the context of the call site
+  // during instantiation. This is a workaround for when TreeTransform
+  // tries to capture an untransformed variable (ie in TransformSizeOfPackExpr)
+  if (!CodeSynthesisContexts.empty() &&
+      VarDC == dyn_cast<ParametricExpressionDecl>(
+                              CodeSynthesisContexts.back().Entity)) {
+    VarDC = CurContext;
+  }
+
   DeclContext *DC = CurContext;
   const unsigned MaxFunctionScopesIndex = FunctionScopeIndexToStopAt
       ? *FunctionScopeIndexToStopAt : FunctionScopes.size() - 1;

@@ -12923,7 +12923,9 @@ TreeTransform<Derived>::TransformParametricExpressionCallExpr(
   bool ParamChanged = false;
   llvm::SmallVector<ParmVarDecl*, 16> NewParmVarDecls{};
   for (ParmVarDecl* PD : E->parameters()) {
-    assert(!PD->isUsingSpecified() && "Using parameters should be substituted already");
+    // skip `using` parameters
+    if (PD->isUsingSpecified())
+      continue;
     ExprResult NewInit = getDerived().TransformExpr(PD->getInit());
     if (NewInit.isInvalid())
       return ExprError();
